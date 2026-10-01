@@ -258,3 +258,43 @@ isolation between compositions and AI recovery after disabling Rime. The fork's
 66 existing tests and separate real-key cancellation regression also pass. The
 new cancellation test fails against the pre-fix virtualtext.lua from `cc0346c`;
 this is a verified regression test, not merely a green smoke test.
+
+## Reproducible Pure data preparation
+
+Install build/runtime packages yourself (Ubuntu baseline above). For the tested
+Pure variant, librime-lua is **not required**: it has no Lua engine components.
+Do not confuse Rime's native `script_translator` with a Lua translator.
+
+Prepare a **new, dedicated** directory; never unpack over existing personal data.
+For this configuration's default location, use `$HOME/.local/share/nvim/rime-bridge`
+(or your XDG/Neovim data directory). For an existing directory, back it up and
+review upstream/custom changes manually rather than running this fresh-install
+example:
+
+```sh
+data="$HOME/.local/share/nvim/rime-bridge"
+test ! -e "$data" || { echo "Refusing to replace existing data"; exit 1; }
+download="$(mktemp -d)"
+curl --fail --location --retry 3 -o "$download/pure.zip" \
+  https://github.com/amzxyz/rime-wanxiang/releases/download/v18.0.15/rime-wanxiang-pure.zip
+echo "582b6842ea6d4aebb5f6863df309f550a7104eb01fcfa6ae8d4dea88c3c2b31b  $download/pure.zip" | sha256sum --check
+mkdir -p "$data"
+unzip -q "$download/pure.zip" -d "$data"
+```
+
+The measured test directory also contains the upstream
+`wanxiang-lts-zh-hans.gram` resource from
+[the LTS model release](https://github.com/amzxyz/RIME-LMDG/releases/tag/LTS).
+The measured asset SHA-256 is
+`20b425ef65151c418248d2e9610fa5ebccddb846510c8282c8d25b5f108e5a3a`.
+The LTS asset URL is mutable: verify the digest before using it for the same
+baseline; a different digest requires a new integration run, not blind acceptance.
+Its presence is not proof that the old system engine activates the model.
+
+After configuring user_dir, explicitly run RimeDeploy, inspect RimeInfo, and
+then enable Rime in an ordinary buffer and type `nihao`, Space. Check `你好`
+is committed once. Keep source YAML/custom patches/dictionaries under your own
+management; build caches and learned userdb belong to that dedicated directory.
+The plugin does not download/update these resources for you.
+
+See [source-release checklist and tested versions](doc/release.md).

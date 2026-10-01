@@ -1,0 +1,63 @@
+name: Linux x86_64 source build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install system build and fixture dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ cmake librime-dev librime-data rime-data-luna-pinyin nlohmann-json3-dev python3
+      - name: Install fixed Neovim for tests
+        run: |
+          curl --fail --location --retry 3 -o nvim.tar.gz https://github.com/neovim/neovim/releases/download/v0.11.5/nvim-linux-x86_64.tar.gz
+          echo 'b2f91117be5b5ea39edd7297156dc2a4a8df4add6c95a90809a8df19e7ab6f52  nvim.tar.gz' | sha256sum --check
+          tar -xzf nvim.tar.gz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+      - name: Fixed Blink dependency
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Saghen/blink.cmp
+          ref: 78336bc89ee5365633bcf754d93df01678b5c08f # v1.10.2
+          path: build-deps/blink.cmp
+          persist-credentials: false
+      - name: Fixed Minuet dependency with late-result cancellation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: vex9z7/minuet-ai.nvim
+          ref: c2740cd0aef0319c5720c9fd03cedcdff7faa2c1
+          path: build-deps/minuet-ai.nvim
+          persist-credentials: false
+      - name: Configure, build and test
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release             -DNVIM_EXECUTABLE="$(command -v nvim)"             -DRIME_BRIDGE_BLINK_DIR="$PWD/build-deps/blink.cmp"             -DRIME_BRIDGE_MINUET_DIR="$PWD/build-deps/minuet-ai.nvim"
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+          cmake --install build --prefix "$RUNNER_TEMP/rime-install"
+          test -x "$RUNNER_TEMP/rime-install/bin/rime-bridge-worker"
+          nvim --version | head -1
+          ldd --version | head -1
+          dpkg-query -W librime1 librime-dev nlohmann-json3-dev
+      - name: Test Minuet cancellation dependency
+        working-directory: build-deps/minuet-ai.nvim
+        run: make test
+      - name: Preserve fixed-fixture CTest evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ctest-linux-x86_64
+          path: build/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7
