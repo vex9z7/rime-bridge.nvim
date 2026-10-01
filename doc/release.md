@@ -44,8 +44,11 @@ manual release gate; deterministic CI fixtures do not substitute for that test.
 - [x] Fixed fixtures and real-key tests, including faults, cancellation and AI races.
 - [x] Pinned Pure real-key baseline on host x86_64.
 - [x] Document data ownership, explicit deploy and source-only distribution.
-- [ ] Hosted CI green at the release commit; record run URL.
-- [ ] Real LazyVim setup/key/snippet integration accepted and recorded.
+- [x] Hosted CI green at ee4f6bd: [run 36837255994](https://github.com/vex9z7/rime-bridge.nvim/actions/runs/36837255994).
+      Re-run at the final release commit before tagging.
+- [x] Actual LazyVim configuration with Pure, shared Blink/Minuet keys, AI preset
+      switching, late responses and native snippet coexistence passes headlessly.
+      Live-session visible typing is not claimed.
 - [ ] Owner selects a license and confirms rights to extracted original code.
 - [ ] Add chosen LICENSE and third-party notices as applicable; verify no scheme,
       dictionary/model, system libraries or learned user data in source archive.

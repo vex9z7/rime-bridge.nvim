@@ -1,10 +1,11 @@
 # rime-bridge.nvim
 
-**Production implementation in progress, not a released input-method plugin.**
+**First-version implementation; source release awaits license approval.**
 This independent source tree starts with a system-Rime native worker and protocol
 regressions, Lua lifecycle/health checks, opt-in ordinary-buffer input and a Blink
-adapter. Full release and real-configuration acceptance are pending. It does not create a scratch buffer or enable input in
-any existing Neovim configuration.
+adapter. Real LazyVim integration has been tested separately; publishing a source
+release still requires the license checklist below. setup does not create a
+scratch buffer or automatically enable input.
 
 ## Build the worker
 
@@ -96,7 +97,8 @@ The prototype-independent input adapter temporarily owns these insert-mode keys.
 The default native UI does not isolate competing completion. Use an isolated
 configuration for native mode, or the explicit Blink adapter below. Standalone
 AI virtual-text producers still require separate integration. No default F6 or global input
-mapping is installed. Do not enable by default in the normal configuration yet.
+mapping is installed by the plugin itself. Configuration may add a toggle, but
+input remains off until explicitly enabled.
 
 start() initializes only the backend, without selecting/deploying a schema or
 capturing keys. stop() detaches input and closes the backend; disable() keeps the
@@ -200,8 +202,10 @@ retain the normal input adapter's behavior. Source refresh uses public Blink
 show/select APIs; no private runtime configuration or event emitters are patched.
 
 This isolates Blink providers and wrapped key chains, **not arbitrary external
-plugins**. Minuet has a separate opt-in adapter below. Real LazyVim configuration
-activation, snippet coexistence and a live user-session trial remain pending.
+plugins**. Minuet has a separate opt-in adapter below. The target LazyVim config
+passes a separate headless Pure integration test, including shared Ctrl-y,
+switching Minuet presets, native snippets and returning to ordinary completion.
+This is not a visible live-session demonstration.
 
 ### Blink tests
 
@@ -237,7 +241,7 @@ Wrap the full Minuet options before its single setup call:
 require("minuet").setup(require("rime_bridge.minuet").options(minuet_opts))
 ```
 
-Existing predicates are preserved. Rime activation dismisses already-loaded
+Existing predicates, including explicit preset predicate lists, are preserved. Rime activation dismisses already-loaded
 Minuet virtual text immediately, including during worker startup, without
 lazy-loading Minuet or modifying its internal state. Only the enabled/pending
 target buffer is reserved; an aborted startup after switching buffers releases

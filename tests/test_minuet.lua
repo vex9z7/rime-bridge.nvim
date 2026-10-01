@@ -16,7 +16,13 @@ config.enable_predicates = {
 		return true
 	end,
 }
+config.presets = { other = { enable_predicates = {
+	function()
+		return true
+	end,
+} } }
 package.loaded.minuet = { config = adapter.options(config) }
+assert(#config.presets.other.enable_predicates == 1, "adapter mutated original preset")
 assert(#config.enable_predicates == 1, "adapter mutated original options")
 package.loaded["minuet.backends.rime_test"] = {
 	complete = function(_, done, partial)
@@ -54,6 +60,8 @@ local steps = {
 		assert(vt.action.is_visible())
 		plugin.enable()
 		assert(not adapter.allowed() and not vt.action.is_visible(), "enable did not dismiss AI immediately")
+		local preset = package.loaded.minuet.config.presets.other
+		assert(not preset.enable_predicates[2](), "preset bypassed isolation")
 		requests[1].done({ "LATE_AI" })
 		assert(not vt.action.has_suggestion(), "old request survived enable")
 	end,

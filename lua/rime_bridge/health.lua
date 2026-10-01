@@ -1,7 +1,7 @@
 local M = {}
 function M.check()
 	local health = vim.health
-	health.start("rime-bridge.nvim (implementation in progress)")
+	health.start("rime-bridge.nvim")
 	if vim.fn.has("nvim-0.10") == 1 then
 		health.ok("Neovim >= 0.10")
 	else
@@ -44,6 +44,8 @@ function M.check()
 			health.error("Configure Blink with rime_bridge.blink.options before enabling input")
 		end
 	end
-	health.warn("Real-configuration/standalone AI virtual-text integration remains unvalidated")
+	health.warn(
+		"Validated with the pinned Blink/Minuet adapters; arbitrary external AI plugins and model effectiveness are not covered"
+	)
 end
 return M

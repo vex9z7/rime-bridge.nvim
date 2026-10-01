@@ -8,6 +8,12 @@ function M.options(opts)
 	opts = vim.deepcopy(opts or {})
 	opts.enable_predicates = opts.enable_predicates or {}
 	table.insert(opts.enable_predicates, M.allowed)
+	-- Minuet presets replace predicate lists, so guard explicit preset lists too.
+	for _, preset in pairs(opts.presets or {}) do
+		if preset.enable_predicates then
+			table.insert(preset.enable_predicates, M.allowed)
+		end
+	end
 	return opts
 end
 function M.dismiss()
