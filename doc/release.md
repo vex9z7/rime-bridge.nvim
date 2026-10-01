@@ -49,13 +49,17 @@ manual release gate; deterministic CI fixtures do not substitute for that test.
 - [x] Actual LazyVim configuration with Pure, shared Blink/Minuet keys, AI preset
       switching, late responses and native snippet coexistence passes headlessly.
       Live-session visible typing is not claimed.
-- [ ] Owner selects a license and confirms rights to extracted original code.
-- [ ] Add chosen LICENSE and third-party notices as applicable; verify no scheme,
+- [x] Owner approved MIT for the original plugin source on 2026-10-01.
+- [x] Added MIT LICENSE and dependency/data NOTICE.md; source archive excludes scheme,
       dictionary/model, system libraries or learned user data in source archive.
-- [ ] Update checklist/README to the actual release status and create annotated
-      source tag only after those gates pass.
+- [x] README and CHANGELOG describe v0.1.0 and its measured scope.
 
-License choice is deliberately pending: do not infer MIT from the Lua ecosystem.
+Publishing procedure: verify hosted CI succeeds at the exact final source commit,
+then create and push the annotated v0.1.0 source tag. Record that commit, CI run
+and remote tag verification in the parent implementation evidence; do not advance
+a tag to another commit after publishing it.
+
+MIT was explicitly selected by the owner; see LICENSE and NOTICE.md.
 The project links user-installed librime and nlohmann-json; their own licenses
 still apply. Wanxiang dictionaries/models remain separate upstream downloads
 under their upstream terms, not assets redistributed by this plugin. Blink and

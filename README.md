@@ -1,11 +1,11 @@
 # rime-bridge.nvim
 
-**First-version implementation; source release awaits license approval.**
+**v0.1.0 — MIT-licensed source release.**
 This independent source tree starts with a system-Rime native worker and protocol
 regressions, Lua lifecycle/health checks, opt-in ordinary-buffer input and a Blink
-adapter. Real LazyVim integration has been tested separately; publishing a source
-release still requires the license checklist below. setup does not create a
-scratch buffer or automatically enable input.
+adapter. Real LazyVim integration has been tested separately. setup does not
+create a scratch buffer or automatically enable input. See [release notes](CHANGELOG.md)
+and [dependency/data boundaries](NOTICE.md).
 
 ## Build the worker
 
@@ -48,7 +48,9 @@ parent-repository paths. The worker uses the official Rime C API and user-instal
 system dependencies, with no private library bundle.
 
 Protocol tests are not proof of normal-buffer/Blink input. See doc/protocol.md.
-A license has not yet been selected; no new license grant is implied by extraction.
+Original plugin source is covered by the [MIT License](LICENSE), approved by the
+repository owner. Separately installed dependencies and scheme data retain their
+own terms; see [NOTICE.md](NOTICE.md).
 
 ## Foundation verification
 
