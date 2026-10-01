@@ -94,17 +94,17 @@ struct Engine {
     require(requested.is_absolute(), "user_dir must be absolute");
     fs::create_directories(requested);
     user = fs::canonical(requested).string();
-    auto path = fs::path(user) / ".rime-input.lock";
+    auto path = fs::path(user) / ".rime-bridge.lock";
     lock = ::open(path.c_str(), O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600);
     require(lock >= 0, "cannot open user directory lock");
     require(flock(lock, LOCK_EX | LOCK_NB) == 0, "user directory busy (one writer only)");
     RIME_STRUCT_INIT(RimeTraits, traits);
     traits.shared_data_dir = shared.c_str();
     traits.user_data_dir = user.c_str();
-    traits.distribution_name = "Rime Input";
-    traits.distribution_code_name = "rime-input";
-    traits.distribution_version = RIME_INPUT_VERSION;
-    traits.app_name = "rime.input";
+    traits.distribution_name = "Rime Bridge";
+    traits.distribution_code_name = "rime-bridge";
+    traits.distribution_version = RIME_BRIDGE_VERSION;
+    traits.app_name = "rime.bridge";
     traits.log_dir = "";
     traits.min_log_level = 2;
     traits.modules = modules;
@@ -122,7 +122,7 @@ struct Engine {
     new_session();
   }
   json info() {
-    return {{"protocol", 1}, {"runtime", RIME_INPUT_VERSION},
+    return {{"protocol", 1}, {"runtime", RIME_BRIDGE_VERSION},
             {"engine", api->get_version()}, {"extensions", lua ? json::array({"lua"}) : json::array()},
             {"library", library}, {"lua_plugin", plugin},
             {"shared_dir", shared}, {"user_dir", user}};

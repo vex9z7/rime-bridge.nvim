@@ -30,9 +30,9 @@ end
 
 function M.setup(opts)
 	opts = opts or {}
-	assert(type(opts) == "table", "rime_input.setup expects a table")
+	assert(type(opts) == "table", "rime_bridge.setup expects a table")
 	local next_config = vim.tbl_extend("force", {
-		worker = "rime-input-worker",
+		worker = "rime-bridge-worker",
 		schema = "wanxiang",
 		require_lua = false,
 	}, opts)
@@ -55,13 +55,13 @@ function M.setup(opts)
 	vim.api.nvim_create_user_command("RimeInfo", function()
 		vim.print(M.status())
 	end, { force = true })
-	local group = vim.api.nvim_create_augroup("RimeInputLifecycle", { clear = true })
+	local group = vim.api.nvim_create_augroup("RimeBridgeLifecycle", { clear = true })
 	vim.api.nvim_create_autocmd("VimLeavePre", { group = group, callback = M.stop })
 end
 
 -- Explicit backend initialization only; does not deploy or intercept input.
 function M.start()
-	assert(config, "Call rime_input.setup first")
+	assert(config, "Call rime_bridge.setup first")
 	if client then
 		return
 	end
@@ -70,7 +70,7 @@ function M.start()
 		return
 	end
 	state = { phase = "starting" }
-	local ok, started = pcall(require("rime_input.client").start, config.worker, fail)
+	local ok, started = pcall(require("rime_bridge.client").start, config.worker, fail)
 	if not ok then
 		fail(tostring(started))
 		return

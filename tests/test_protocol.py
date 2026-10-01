@@ -77,7 +77,7 @@ class Client:
             r = self.call("key", key=ord(key))
         return r
 
-with tempfile.TemporaryDirectory(prefix="rime-input-test-") as tmp:
+with tempfile.TemporaryDirectory(prefix="rime-bridge-test-") as tmp:
     user = Path(tmp)
     custom = user / "default.custom.yaml"
     custom.write_text("patch:\n  schema_list:\n    - schema: luna_pinyin_simp\n")

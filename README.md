@@ -1,4 +1,4 @@
-# rime-input.nvim
+# rime-bridge.nvim
 
 **Production implementation in progress, not a released input-method plugin.**
 This independent source tree starts with a system-Rime native worker and protocol
@@ -21,7 +21,7 @@ ctest --test-dir build --output-on-failure
 cmake --install build --prefix "$HOME/.local"
 ```
 
-This installs `rime-input-worker` in the selected prefix's bin directory, not
+This installs `rime-bridge-worker` in the selected prefix's bin directory, not
 librime or Lua files. Neovim plugin managers install the Lua modules; CMake does not install them. Use `-DBUILD_TESTING=OFF` for builds without the Python test runner.
 A local build is not a universally portable binary.
 
@@ -64,19 +64,19 @@ Neovim >=0.10 is required; the actual tested host is Neovim 0.12.5.
 Put this repository on runtimepath through your plugin manager, then:
 
 ```lua
-require("rime_input").setup({
-  worker = "/absolute/path/to/rime-input-worker", -- defaults to PATH lookup
+require("rime_bridge").setup({
+  worker = "/absolute/path/to/rime-bridge-worker", -- defaults to PATH lookup
   user_dir = "/absolute/path/to/dedicated-rime-data",
   schema = "wanxiang",
 })
 ```
 
 setup does not spawn a process, create buffers, deploy data or install mappings.
-For backend diagnostics only, call `require("rime_input").start()` explicitly;
+For backend diagnostics only, call `require("rime_bridge").start()` explicitly;
 this initializes the engine, checks protocol 1 and reports `initialized`, not
 input-ready. It does not select/deploy a schema. `:RimeInfo` reports state;
-`:checkhealth rime_input` inspects configuration/runtime without launching a worker.
-Use `require("rime_input").stop()` to close it; editor exit closes it as well.
+`:checkhealth rime_bridge` inspects configuration/runtime without launching a worker.
+Use `require("rime_bridge").stop()` to close it; editor exit closes it as well.
 Engine stderr is discarded by the default Lua client to avoid retaining input
 content; more actionable privacy-safe engine diagnostics remain a future task.
 

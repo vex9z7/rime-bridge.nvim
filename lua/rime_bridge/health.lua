@@ -1,13 +1,13 @@
 local M = {}
 function M.check()
 	local health = vim.health
-	health.start("rime-input.nvim (implementation in progress)")
+	health.start("rime-bridge.nvim (implementation in progress)")
 	if vim.fn.has("nvim-0.10") == 1 then
 		health.ok("Neovim >= 0.10")
 	else
 		health.error("Neovim >= 0.10 is required")
 	end
-	local plugin = require("rime_input")
+	local plugin = require("rime_bridge")
 	local config = plugin.config()
 	if not config then
 		health.error("Call setup with an absolute dedicated user_dir")

@@ -1,14 +1,14 @@
 -- Run under nvim --headless -u NONE; no user's configuration or data involved.
 local function test()
-	vim.opt.runtimepath:prepend(vim.env.RIME_INPUT_SOURCE)
-	local plugin = require("rime_input")
+	vim.opt.runtimepath:prepend(vim.env.RIME_BRIDGE_SOURCE)
+	local plugin = require("rime_bridge")
 	local buffers = #vim.api.nvim_list_bufs()
 	local user = vim.fn.tempname()
-	local worker = assert(vim.env.RIME_INPUT_WORKER, "worker path required")
+	local worker = assert(vim.env.RIME_BRIDGE_WORKER, "worker path required")
 	local requests, closed = {}, false
 	local callback
-	local original = require("rime_input.client")
-	package.loaded["rime_input.client"] = {
+	local original = require("rime_bridge.client")
+	package.loaded["rime_bridge.client"] = {
 		start = function()
 			return {
 				request = function(_, op, _, _, cb)
@@ -30,7 +30,7 @@ local function test()
 	assert(closed and plugin.status().phase == "failed", "mismatch must close worker")
 	assert(plugin.status().error:find("protocol"))
 	plugin.stop()
-	package.loaded["rime_input.client"] = original
+	package.loaded["rime_bridge.client"] = original
 
 	-- Actual executable, protocol handshake, shutdown and no schema seeding.
 	plugin.setup({ worker = worker, user_dir = user })
