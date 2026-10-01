@@ -33,6 +33,6 @@ function M.check()
 	else
 		health.info("Worker has not initialized; executable presence alone does not verify dependencies")
 	end
-	health.warn("Normal-buffer input and Blink integration are not yet implemented")
+	health.warn("Ordinary-buffer input is opt-in; Blink/completion isolation is not yet implemented")
 end
 return M

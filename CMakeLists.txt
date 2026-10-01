@@ -42,3 +42,12 @@ if(BUILD_TESTING)
     message(STATUS "Neovim not found: lua.foundation test unavailable; only native tests will run")
   endif()
 endif()
+
+if(BUILD_TESTING AND NVIM_EXECUTABLE)
+  add_test(NAME lua.input COMMAND "${CMAKE_COMMAND}" -E env
+    "RIME_BRIDGE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+    "RIME_BRIDGE_WORKER=$<TARGET_FILE:rime-bridge-worker>"
+    "${NVIM_EXECUTABLE}" --headless -u NONE -i NONE
+    -c "lua dofile('${CMAKE_CURRENT_SOURCE_DIR}/tests/test_input.lua')")
+  set_tests_properties(lua.input PROPERTIES TIMEOUT 60)
+endif()

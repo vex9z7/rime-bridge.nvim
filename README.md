@@ -2,15 +2,16 @@
 
 **Production implementation in progress, not a released input-method plugin.**
 This independent source tree starts with a system-Rime native worker and protocol
-regressions and a Lua lifecycle/health foundation. Ordinary-buffer input, Blink
-integration and release acceptance are pending. It does not create a scratch buffer or enable input in
+regressions, Lua lifecycle/health checks and opt-in ordinary-buffer input. Blink
+integration and full release acceptance are pending. It does not create a scratch buffer or enable input in
 any existing Neovim configuration.
 
 ## Build the worker
 
 Linux, a C++17 compiler, CMake >=3.16, system librime development files and
 nlohmann-json headers/CMake package are required. Tests additionally need Python3
-and a Rime shared-data directory at /usr/share/rime-data. Ubuntu package names:
+and a Rime shared-data directory at /usr/share/rime-data with luna_pinyin_simp
+for the native protocol suite (Ubuntu: rime-data-luna-pinyin). Ubuntu package names:
 `g++ cmake librime-dev nlohmann-json3-dev librime-data python3`.
 Install dependencies yourself; CMake does not download them or build librime.
 
@@ -58,36 +59,89 @@ configure-time missing-dependency error. Normal-buffer/real-key production tests
 have not yet run; historical scratch results are not substituted for those gates.
 
 
-## Lua foundation (not input activation yet)
+## Opt-in ordinary-buffer input
 
-Neovim >=0.10 is required; the actual tested host is Neovim 0.12.5.
-Put this repository on runtimepath through your plugin manager, then:
+Neovim >=0.10 is required; the tested host is Neovim 0.12.5. Load this repository
+through your plugin manager, then configure a dedicated, prepared Rime directory:
 
 ```lua
 require("rime_bridge").setup({
-  worker = "/absolute/path/to/rime-bridge-worker", -- defaults to PATH lookup
+  worker = "/absolute/path/to/rime-bridge-worker", -- default: PATH lookup
   user_dir = "/absolute/path/to/dedicated-rime-data",
-  schema = "wanxiang",
+  schema = "wanxiang_pure", -- default; use the upstream Pure schema ID
 })
 ```
 
-setup does not spawn a process, create buffers, deploy data or install mappings.
-For backend diagnostics only, call `require("rime_bridge").start()` explicitly;
-this initializes the engine, checks protocol 1 and reports `initialized`, not
-input-ready. It does not select/deploy a schema. `:RimeInfo` reports state;
-`:checkhealth rime_bridge` inspects configuration/runtime without launching a worker.
-Use `require("rime_bridge").stop()` to close it; editor exit closes it as well.
-Engine stderr is discarded by the default Lua client to avoid retaining input
-content; more actionable privacy-safe engine diagnostics remain a future task.
+setup does not start a worker, create buffers, install mappings or deploy data.
+For a newly prepared/changed data directory, use `:RimeDeploy` explicitly and wait
+until `:RimeInfo` reports initialized. Deployment disables input and is never
+performed implicitly by enable/start. It does not download a scheme or seed data.
 
-CTest adds lua.foundation when Neovim is found (or specified with
--DNVIM_EXECUTABLE=/path/to/nvim); absence is reported, not counted as a pass.
-Both worker.protocol and lua.foundation passed on the actual host. The latter
-checks setup isolation, incompatible protocol rejection, real worker handshake,
-shutdown, configuration isolation and missing-executable errors. This is not an
-editor key/normal-buffer acceptance test.
+In a modifiable ordinary file buffer, use `:RimeEnable`, `:RimeDisable` or
+`:RimeToggle`. Matching Lua functions are enable(), disable(), toggle(), deploy().
+Activation is asynchronous; `:RimeInfo` reports enabled once the schema is selected.
+Only one buffer is enabled at a time. Enabling another detaches the previous one;
+leaving a buffer cancels composition without moving it to another buffer.
+
+While enabled:
+- Printable ASCII goes to Rime; inline preedit is not inserted into the file.
+- A simple native floating window shows candidates in engine order.
+- Space/Enter commits, 1–9 selects, -/= pages, Ctrl-n/p moves candidate selection.
+- Esc, cursor movement, Tab, mode/buffer/window changes cancel composition.
+- Paste via nvim_paste cancels composition and delegates to the original paste handler.
+- Disabling removes owned mappings and restores previous buffer mappings; mappings
+  replaced by the user while active are not overwritten on cleanup.
+
+The prototype-independent input adapter temporarily owns these insert-mode keys.
+It does not yet cooperate with Blink, snippets or AI completions; use an isolated
+configuration with those disabled for this stage. No default F6 or global input
+mapping is installed. Do not enable by default in the normal configuration yet.
+
+start() initializes only the backend, without selecting/deploying a schema or
+capturing keys. stop() detaches input and closes the backend; disable() keeps the
+worker available. Exiting Neovim closes it. `:checkhealth rime_bridge` checks
+configuration/runtime without starting it. Worker errors/timeouts restore maps,
+remove UI and notify; inspect `:RimeInfo` and explicitly re-enable after fixing the
+cause. Uncertain pending input is not replayed after failure to avoid duplication.
+Engine stderr is not retained by default; complete component diagnostics remain pending.
+
+## Editor regression tests
+
+CTest includes lua.foundation and lua.input when Neovim is found (or selected
+with -DNVIM_EXECUTABLE=/path/to/nvim). Missing Neovim is reported, not a test pass.
+The ordinary-buffer suite uses actual nvim_input events and nvim_paste, with no
+Chinese buffer insertion used as typing evidence. It tests commit/rapid input,
+selection/paging, cancel, undo/redo, mapping restoration, paste, buffer/cursor
+changes, forced delayed responses, timeout/restart and worker death.
+
+To run against an explicitly prepared **test-only** Pure directory:
+
+```sh
+RIME_BRIDGE_SOURCE="$PWD" \
+RIME_BRIDGE_WORKER="$PWD/build/rime-bridge-worker" \
+RIME_TEST_USER_DIR=/absolute/isolated-pure-test-data \
+RIME_TEST_SCHEMA=wanxiang_pure \
+nvim --headless -u NONE -i NONE -c "lua dofile('tests/test_input.lua')"
+```
+
+The supplied test directory is deployed and accumulates learning data; it is not
+deleted. Never point this regression at a personal or live desktop-IME directory.
+Without it, the editor test uses the small fixed dictionary/schema in tests/fixtures
+in an automatically removed temporary directory. The native protocol suite still
+requires system luna_pinyin_simp data. Real-scheme tests are a separate acceptance layer.
 
 Repeatability check: after making edited test-fixture mtimes distinct for the old
 engine's deployment cache, `ctest --repeat until-fail:5` passed both suites five
 times on the host (exit 0). An earlier rapid-edit run missed the newly added
 schema; this fixture correction does not claim a production deployment-cache fix.
+
+
+## Ordinary-buffer acceptance — 2026-10-01
+
+On Ubuntu 22.04 x86_64 with system librime 1.7.3 and Neovim 0.12.5, the final
+three-test CTest suite passes. The same real-key ordinary-buffer regression also
+passes with an isolated Wanxiang Pure v18.0.15 directory (exit 0, explicit PASS).
+The tests include forced timeout/restart and worker death; error notifications in
+that test output are expected. Lua formatting/lint checks pass. This evidence is
+headless input, not a demonstration in the user's active editor, and does not
+validate Blink/AI coexistence, ARM64 or language-model effectiveness.

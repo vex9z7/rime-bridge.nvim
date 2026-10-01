@@ -32,20 +32,21 @@ local function test()
 	plugin.stop()
 	package.loaded["rime_bridge.client"] = original
 
-	-- Actual executable, protocol handshake, shutdown and no schema seeding.
+	-- Actual executable, protocol handshake, startup-toggle cancellation and no seeding.
 	plugin.setup({ worker = worker, user_dir = user })
-	plugin.start()
+	plugin.toggle()
+	plugin.toggle()
 	assert(vim.wait(10000, function()
 		return plugin.status().phase ~= "starting"
 	end, 10))
 	local status = plugin.status()
-	assert(status.phase == "initialized", vim.inspect(status))
+	assert(status.phase == "initialized" and not status.enabled, vim.inspect(status))
 	assert(status.info.protocol == 1 and status.info.runtime == "0.1.0", "unexpected worker identity")
 	assert(vim.fn.filereadable(user .. "/default.custom.yaml") == 0, "must not seed configuration")
 	assert(#vim.api.nvim_list_bufs() == buffers, "must not create buffers")
 	local snapshot = plugin.config()
 	snapshot.schema = "modified"
-	assert(plugin.config().schema == "wanxiang", "configuration leaked by reference")
+	assert(plugin.config().schema == "wanxiang_pure", "configuration leaked by reference")
 	plugin.stop()
 	assert(plugin.status().phase == "stopped", "stop failed")
 	-- Let normal EOF shutdown complete before deleting disposable data.

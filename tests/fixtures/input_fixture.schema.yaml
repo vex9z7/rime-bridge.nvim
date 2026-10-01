@@ -1,0 +1,16 @@
+schema:
+  schema_id: input_fixture
+  name: Deterministic input test
+  version: "1"
+engine:
+  processors: [speller, selector, navigator, express_editor]
+  segmentors: [abc_segmentor]
+  translators: [table_translator]
+speller:
+  alphabet: abcdefghijklmnopqrstuvwxyz
+translator:
+  dictionary: input_fixture
+  enable_sentence: false
+  enable_user_dict: false
+menu:
+  page_size: 3
