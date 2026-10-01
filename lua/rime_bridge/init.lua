@@ -7,8 +7,10 @@ local input
 local serial = 0
 local waiting = {}
 local wanted = false
+local wanted_buf
 
 local function fail(reason)
+	local diagnostics = client and client.diagnostics and client.diagnostics.snapshot() or {}
 	wanted = false
 	waiting = {}
 	if input then
@@ -20,7 +22,7 @@ local function fail(reason)
 		client:close()
 	end
 	client = nil
-	state = { phase = "failed", error = reason }
+	state = { phase = "failed", error = reason, diagnostics = diagnostics }
 	vim.notify("Rime stopped; ordinary editing restored. See :RimeInfo for diagnostics", vim.log.levels.ERROR)
 end
 
@@ -42,12 +44,15 @@ end
 -- Configuration integrations may query this without loading any AI provider.
 function M.is_active()
 	return wanted
-		and config ~= nil
+		and wanted_buf == vim.api.nvim_get_current_buf()
 		and (input == nil or (not input.closed and input.buf == vim.api.nvim_get_current_buf()))
 end
 
 function M.status()
 	local result = vim.deepcopy(state)
+	if client and client.diagnostics then
+		result.diagnostics = client.diagnostics.snapshot()
+	end
 	result.enabled = input ~= nil and not input.closed
 	return result
 end
@@ -166,6 +171,7 @@ function M.enable()
 	local token, buf, win = serial, vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
 	assert(vim.bo[buf].buftype == "" and vim.bo[buf].modifiable, "Enable Rime in a modifiable ordinary buffer")
 	wanted = true
+	wanted_buf = buf
 	require("rime_bridge.minuet").dismiss()
 	M.start(function()
 		if token ~= serial then
@@ -173,12 +179,11 @@ function M.enable()
 		end
 		local current = client
 		current:request("schema", current.generation or 0, { schema = config.schema }, function()
-			if
-				token ~= serial
-				or current ~= client
-				or vim.api.nvim_get_current_buf() ~= buf
-				or vim.api.nvim_get_current_win() ~= win
-			then
+			if token ~= serial or current ~= client then
+				return
+			end
+			if vim.api.nvim_get_current_buf() ~= buf or vim.api.nvim_get_current_win() ~= win then
+				wanted = false
 				return
 			end
 			input = require("rime_bridge.input").attach(current, config.ui)

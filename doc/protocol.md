@@ -13,7 +13,7 @@ Operations: init, info, deploy, schemas, schema, key, select, clear, shutdown.
 Init requires an absolute user_dir; optional shared_dir, lua_plugin and require_lua
 configure installed resources. Lua paths are trusted native code, not sandboxed.
 Info returns protocol=1, worker runtime version, engine version, loaded library,
-extensions and resource paths. The future editor client must reject mismatches.
+extensions and resource paths. The editor client rejects protocol mismatches.
 
 Key takes an integer key and optional mask; select takes a zero-based current-page
 index. Context returns preedit, ordered candidates, selected index, page/last_page,
@@ -24,3 +24,10 @@ against editor anchors. Deploy is explicit and invalidates the native session.
 Limitations: API deployment success does not prove every schema component loaded.
 Inspect diagnostics and validate actual candidates. Native startup dependency
 errors can occur before a JSON response; clients must handle exit/stderr too.
+
+The editor classifies stderr into a bounded set of fixed diagnostic hints; raw
+stderr is not persisted or shown. A transient 4 KiB framing tail recognizes split
+messages. This is deliberately lossy and does not prove component functionality.
+Use actual candidate tests after deployment. Library/API errors, explicit Lua
+requirements, missing schemas and writer locks also have framed protocol errors
+when startup has reached the protocol loop.

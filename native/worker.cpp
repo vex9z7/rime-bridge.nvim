@@ -70,7 +70,7 @@ struct Engine {
   }
   void new_session() {
     session = api->create_session();
-    require(session != 0, "cannot create session; inspect stderr");
+    require(session != 0, "cannot create session; check system Rime and deployed data");
   }
   void init(const json& q) {
     require(!attempted, "init allowed once per worker; restart after failure");
@@ -97,7 +97,7 @@ struct Engine {
     auto path = fs::path(user) / ".rime-bridge.lock";
     lock = ::open(path.c_str(), O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600);
     require(lock >= 0, "cannot open user directory lock");
-    require(flock(lock, LOCK_EX | LOCK_NB) == 0, "user directory busy (one writer only)");
+    require(flock(lock, LOCK_EX | LOCK_NB) == 0, "user directory busy (one writer only); stop the other Rime bridge or configure a separate dedicated user_dir; do not delete the lock file");
     RIME_STRUCT_INIT(RimeTraits, traits);
     traits.shared_data_dir = shared.c_str();
     traits.user_data_dir = user.c_str();
@@ -173,7 +173,7 @@ struct Engine {
       deploy_traits.modules = nullptr;
       api->deployer_initialize(&deploy_traits);
       new_session();
-      require(ok, "deployment failed; inspect stderr for schema/component errors");
+      require(ok, "deployment failed; check schema/component diagnostics and scheme files, then explicitly redeploy");
       return info();
     }
     if (op == "schemas") {
@@ -243,7 +243,7 @@ int main() {
       if (!std::cout || shutdown) break;
     }
   } catch (const std::exception& e) {
-    std::cerr << "portable-rime: " << e.what() << '\n';
+    std::cerr << "rime-bridge: " << e.what() << '\n';
     return 1;
   }
 }

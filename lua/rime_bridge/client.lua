@@ -2,11 +2,13 @@
 local M = {}
 function M.start(executable, on_error)
 	local c = { queue = {}, id = 0, partial = "", closed = false }
+	c.diagnostics = require("rime_bridge.diagnostics").new()
 	local function fail(reason)
 		if c.closed then
 			return
 		end
 		c.closed = true
+		c.diagnostics.clear()
 		vim.fn.jobstop(c.job)
 		on_error(reason)
 	end
@@ -52,9 +54,9 @@ function M.start(executable, on_error)
 			fail("Rime worker: " .. tostring(r.error))
 			return
 		end
-		local called, err = pcall(p.callback, r.result)
+		local called = pcall(p.callback, r.result)
 		if not called then
-			fail("Rime response callback: " .. tostring(err))
+			fail("Rime response callback failed; ordinary editing restored")
 			return
 		end
 		pump()
@@ -77,8 +79,8 @@ function M.start(executable, on_error)
 				end
 			end)
 		end,
-		on_stderr = function()
-			-- Engine stderr can contain user input; do not retain it by default.
+		on_stderr = function(_, data)
+			c.diagnostics.feed(data)
 		end,
 		on_exit = function(_, code)
 			vim.schedule(function()
@@ -104,6 +106,7 @@ function M.start(executable, on_error)
 			return
 		end
 		self.closed = true
+		self.diagnostics.clear()
 		self.queue = {}
 		self.pending = nil
 		-- EOF finalizes the engine, flushing learning data and releasing the lock.

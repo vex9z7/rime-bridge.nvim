@@ -71,3 +71,17 @@ if(BUILD_TESTING AND NVIM_EXECUTABLE AND RIME_BRIDGE_BLINK_DIR)
     set_tests_properties(lua.blink_${suite} PROPERTIES TIMEOUT 60)
   endforeach()
 endif()
+
+set(RIME_BRIDGE_MINUET_DIR "" CACHE PATH "Existing Minuet checkout for optional AI isolation test (never downloaded)")
+if(BUILD_TESTING AND NVIM_EXECUTABLE AND RIME_BRIDGE_MINUET_DIR)
+  if(NOT EXISTS "${RIME_BRIDGE_MINUET_DIR}/lua/minuet/virtualtext.lua")
+    message(FATAL_ERROR "RIME_BRIDGE_MINUET_DIR must point to an existing minuet-ai.nvim checkout")
+  endif()
+  add_test(NAME lua.minuet_isolation COMMAND "${CMAKE_COMMAND}" -E env
+    "RIME_BRIDGE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+    "RIME_BRIDGE_WORKER=$<TARGET_FILE:rime-bridge-worker>"
+    "RIME_TEST_MINUET=${RIME_BRIDGE_MINUET_DIR}"
+    "${NVIM_EXECUTABLE}" --headless -u NONE -i NONE
+    -c "lua dofile('${CMAKE_CURRENT_SOURCE_DIR}/tests/test_minuet.lua')")
+  set_tests_properties(lua.minuet_isolation PROPERTIES TIMEOUT 30)
+endif()

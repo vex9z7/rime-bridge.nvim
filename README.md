@@ -55,8 +55,8 @@ On 2026-10-01, configure, compile, CTest (worker.protocol) and installation to a
 isolated local prefix passed on Ubuntu 22.04 x86_64 with GCC 11.4, system librime
 1.7.3 and nlohmann-json 3.10.5. No system packages were installed/upgraded.
 The development container without librime-dev separately exercises the actionable
-configure-time missing-dependency error. Normal-buffer/real-key production tests
-have not yet run; historical scratch results are not substituted for those gates.
+configure-time missing-dependency error. That initial foundation run did not establish normal-buffer acceptance; the
+ordinary-buffer and Blink regressions below now supply that separate evidence.
 
 
 ## Opt-in ordinary-buffer input
@@ -104,7 +104,18 @@ worker available. Exiting Neovim closes it. `:checkhealth rime_bridge` checks
 configuration/runtime without starting it. Worker errors/timeouts restore maps,
 remove UI and notify; inspect `:RimeInfo` and explicitly re-enable after fixing the
 cause. Uncertain pending input is not replayed after failure to avoid duplication.
-Engine stderr is not retained by default; complete component diagnostics remain pending.
+Engine stderr is classified into at most six fixed diagnostic categories exposed
+by RimeInfo/checkhealth (runtime loader, Lua, component, schema, dictionary, generic
+engine). Raw lines, candidate text and commits are never written to diagnostic
+logs or included in these categories; stderr framing uses a transient 4 KiB tail.
+Categories are hints, not proof of a functioning schema: successful deployment
+still requires an actual candidate/commit check. Unknown messages produce only
+the generic hint. No raw-log capture command is provided.
+
+A busy directory fails before key interception, with advice to stop the other
+bridge or configure another dedicated directory. **Do not delete the lock file**
+to work around a live writer. Desktop IMEs use different locking; keep their
+directories separate. RimeDeploy never replaces your source configuration files.
 
 ## Editor regression tests
 
@@ -189,9 +200,8 @@ retain the normal input adapter's behavior. Source refresh uses public Blink
 show/select APIs; no private runtime configuration or event emitters are patched.
 
 This isolates Blink providers and wrapped key chains, **not arbitrary external
-plugins**. In particular Minuet's independently rendered virtual text and other
-standalone AI producers are not claimed integrated. Real LazyVim configuration
-activation, snippets/AI integration and a live user-session trial remain pending.
+plugins**. Minuet has a separate opt-in adapter below. Real LazyVim configuration
+activation, snippet coexistence and a live user-session trial remain pending.
 
 ### Blink tests
 
@@ -212,3 +222,39 @@ v18.0.15 (exit 0, explicit PASS). These are headless tests, not a live-session d
 References: [public source interface](https://cmp.saghen.dev/development/source-boilerplate),
 [configuration](https://cmp.saghen.dev/configuration/reference), and the
 [tested public API implementation](https://github.com/Saghen/blink.cmp/blob/78336bc89ee5365633bcf754d93df01678b5c08f/lua/blink/cmp/init.lua).
+
+## Optional Minuet virtual-text isolation
+
+The tested dependency is the **vex9z7/minuet-ai.nvim fork**, commit
+`c2740cd` (after `0021d27`), not an arbitrary upstream version. That fork checks
+predicates when requesting, receiving, rendering and accepting results, and
+invalidates queued/streaming results on dismissal. Without those changes, a
+predicate only at request time cannot prevent late results from leaking.
+
+Wrap the full Minuet options before its single setup call:
+
+```lua
+require("minuet").setup(require("rime_bridge.minuet").options(minuet_opts))
+```
+
+Existing predicates are preserved. Rime activation dismisses already-loaded
+Minuet virtual text immediately, including during worker startup, without
+lazy-loading Minuet or modifying its internal state. Only the enabled/pending
+target buffer is reserved; an aborted startup after switching buffers releases
+ownership. Disabling Rime permits new AI requests; cancelled old results remain
+invalid. No AI network request is sent by this plugin.
+
+To run the optional real-worker integration test with an existing fixed checkout:
+
+```sh
+cmake -S . -B build -DRIME_BRIDGE_MINUET_DIR=/absolute/path/to/minuet-ai.nvim
+ctest --test-dir build --output-on-failure
+```
+
+The six-test suite (Blink and Minuet paths supplied) passes on the measured host.
+The Minuet test uses actual nvim_input for `nihao → 你好`, real Minuet virtual text
+and a stub **network provider only**. It verifies existing/late AI suppression,
+isolation between compositions and AI recovery after disabling Rime. The fork's
+66 existing tests and separate real-key cancellation regression also pass. The
+new cancellation test fails against the pre-fix virtualtext.lua from `cc0346c`;
+this is a verified regression test, not merely a green smoke test.

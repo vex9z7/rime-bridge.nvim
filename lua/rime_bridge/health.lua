@@ -27,9 +27,13 @@ function M.check()
 	if state.error then
 		health.error(state.error)
 	end
+	for _, message in ipairs(state.diagnostics or {}) do
+		health.warn(message)
+	end
 	if state.info then
 		health.ok("Protocol " .. state.info.protocol .. "; engine " .. tostring(state.info.engine))
 		health.info("Loaded library: " .. tostring(state.info.library))
+		health.info("Registered extensions: " .. table.concat(state.info.extensions or {}, ", "))
 	else
 		health.info("Worker has not initialized; executable presence alone does not verify dependencies")
 	end
