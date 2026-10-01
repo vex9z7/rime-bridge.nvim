@@ -39,6 +39,13 @@ function M.stop()
 	state = { phase = "stopped" }
 end
 
+-- Configuration integrations may query this without loading any AI provider.
+function M.is_active()
+	return wanted
+		and config ~= nil
+		and (input == nil or (not input.closed and input.buf == vim.api.nvim_get_current_buf()))
+end
+
 function M.status()
 	local result = vim.deepcopy(state)
 	result.enabled = input ~= nil and not input.closed
@@ -159,6 +166,7 @@ function M.enable()
 	local token, buf, win = serial, vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
 	assert(vim.bo[buf].buftype == "" and vim.bo[buf].modifiable, "Enable Rime in a modifiable ordinary buffer")
 	wanted = true
+	require("rime_bridge.minuet").dismiss()
 	M.start(function()
 		if token ~= serial then
 			return
