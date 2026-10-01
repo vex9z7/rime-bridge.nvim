@@ -87,6 +87,14 @@ with tempfile.TemporaryDirectory(prefix="rime-bridge-test-") as tmp:
         bad = Client(user)
         assert message in bad.init(ok=False, **args)
         bad.close()
+    # Malformed initialization must not create a directory or acquire its lock.
+    untouched = user / "invalid-init"
+    bad = Client(untouched)
+    error = bad.init(ok=False, require_lua="PRIVATE_INIT_VALUE")
+    assert error == "invalid JSON request or field type", error
+    assert not untouched.exists()
+    assert "not initialized" in bad.call("info", ok=False)
+    bad.close()
     # A plain process can report a missing Lua module without touching the UI.
     plain = Client(user)
     available = plain.call("init", user_dir=plain.user)
@@ -117,7 +125,11 @@ with tempfile.TemporaryDirectory(prefix="rime-bridge-test-") as tmp:
     second = Client(user)
     assert "busy" in second.init(ok=False)
     second.close()
-    c.call("key", key=-1, ok=False)
+    for key in [-1, True, None, "PRIVATE_KEY_VALUE", 1.5, 2**64 - 1]:
+        error = c.call("key", key=key, ok=False)
+        assert "PRIVATE_KEY_VALUE" not in error
+    assert "invalid JSON" in c.call("select", ok=False)
+    assert "out of range" in c.call("select", index=-1, ok=False)
     c.call("schema", schema="does_not_exist", ok=False)
     c.gen -= 1
     c.call("key", key=ord("n"), ok=False)
@@ -196,8 +208,11 @@ end
     c.close()
     # Invalid JSON must be framed as an error, without poisoning the next request.
     c = Client(user)
-    c.p.stdin.write("{broken}\n"); c.p.stdin.flush()
-    assert json.loads(c.p.stdout.readline())["ok"] is False
+    for malformed in ['{"PRIVATE_INPUT":', 'null', '[]', '{"id":true,"generation":0,"op":"info"}']:
+        c.p.stdin.write(malformed + "\n"); c.p.stdin.flush()
+        response = json.loads(c.p.stdout.readline())
+        assert response["ok"] is False
+        assert "PRIVATE_INPUT" not in json.dumps(response)
     c.init()
     # Multiple requests delivered in one pipe write retain their ordering.
     c.p.stdin.write(json.dumps(dict(id=2, generation=0, op="info")) + "\n" +
@@ -210,5 +225,16 @@ end
     # Oversized input exits without buffering an unbounded line.
     p = subprocess.run([worker], input="x"*65538+"\n", text=True, capture_output=True, timeout=10)
     assert p.returncode == 1 and "64 KiB" in p.stderr
-    print("PASS: init/deploy/schema/keys/select/clear, split frames, lock, restart, errors")
+    p = subprocess.run([worker], input='{"id":0', text=True, capture_output=True, timeout=10)
+    assert p.returncode == 1 and "unterminated frame" in p.stderr
+    # EOF must finalize and release the lock without requiring a shutdown request.
+    eof = Client(user)
+    eof.init()
+    eof.p.stdin.close()
+    assert eof.p.wait(timeout=10) == 0
+    eof.cleanup()
+    after_eof = Client(user)
+    after_eof.init()
+    after_eof.close()
+    print("PASS: init/deploy/schema/keys/select/clear, framing, lock/EOF release, restart and private errors")
     print(json.dumps(dict(info=info, deploy_ms=deploy_ms, peak_rss=peak_rss, key_ms_max=max(timings), key_ms_mean=sum(timings)/len(timings))))

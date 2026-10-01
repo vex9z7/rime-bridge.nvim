@@ -10,7 +10,7 @@ and [dependency/data boundaries](NOTICE.md).
 ## Build the worker
 
 Linux, a C++17 compiler, CMake >=3.16, system librime development files and
-nlohmann-json headers/CMake package are required. Tests additionally need Python3
+nlohmann-json >=3.6.0 headers/CMake package are required. Tests additionally need Python3
 and a Rime shared-data directory at /usr/share/rime-data with luna_pinyin_simp
 for the native protocol suite (Ubuntu: rime-data-luna-pinyin). Ubuntu package names:
 `g++ cmake librime-dev nlohmann-json3-dev librime-data python3`.
@@ -87,7 +87,8 @@ Only one buffer is enabled at a time. Enabling another detaches the previous one
 leaving a buffer cancels composition without moving it to another buffer.
 
 While enabled:
-- Printable ASCII goes to Rime; inline preedit is not inserted into the file.
+- Printable ASCII goes to Rime; uncommitted input is kept in engine state,
+  not displayed as inline virtual text or inserted into the file.
 - A simple native floating window shows candidates in engine order.
 - Space/Enter commits, 1–9 selects, -/= pages, Ctrl-n/p moves candidate selection.
 - Esc, cursor movement, Tab, mode/buffer/window changes cancel composition.

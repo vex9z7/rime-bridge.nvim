@@ -31,3 +31,11 @@ messages. This is deliberately lossy and does not prove component functionality.
 Use actual candidate tests after deployment. Library/API errors, explicit Lua
 requirements, missing schemas and writer locks also have framed protocol errors
 when startup has reached the protocol loop.
+
+Worker scope stays deliberately narrow: protocol validation, system-engine
+lifecycle, one-writer locking and C API/result translation. Candidate ranking,
+scheme logic and learning remain in Rime; buffer editing, completion isolation
+and display remain in Lua. Initialization and redeployment use the same session
+setup path; schema-list allocations are freed by one shared implementation.
+Malformed JSON and JSON field-type errors return a fixed message rather than
+echoing parser excerpts. Engine/path failures retain actionable diagnostics.

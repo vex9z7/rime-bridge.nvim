@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Require nlohmann-json >=3.6.0, matching the worker API usage; remove an
+  unused Rime API requirement and share engine/session and schema-list cleanup.
+- Reject malformed protocol input without echoing JSON payloads; validate the
+  Lua requirement before initialization side effects.
+
+- Remove inline pinyin preedit rendering; retain engine composition state,
+  candidate menus, cancellation and commit behavior.
+
 ## 0.1.0 — 2026-10-01
 
 - System-linked C++ worker with CMake build/install and versioned stdio protocol.

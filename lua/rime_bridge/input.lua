@@ -28,13 +28,9 @@ function M.attach(client, ui)
 		vim.keymap.set(mode, lhs, callback, options)
 		s.maps[#s.maps + 1] = { mode = mode, lhs = lhs, previous = previous, callback = callback }
 	end
-	local ns = vim.api.nvim_create_namespace("rime-bridge-" .. s.buf)
 	local function hide()
 		if ui == "blink" then
 			require("rime_bridge.blink").hide()
-		end
-		if vim.api.nvim_buf_is_valid(s.buf) then
-			vim.api.nvim_buf_clear_namespace(s.buf, ns, 0, -1)
 		end
 		if s.popup and vim.api.nvim_win_is_valid(s.popup) then
 			vim.api.nvim_win_close(s.popup, true)
@@ -62,10 +58,6 @@ function M.attach(client, ui)
 		if c.preedit == "" or not valid() then
 			return
 		end
-		vim.api.nvim_buf_set_extmark(s.buf, ns, s.position[1] - 1, s.position[2], {
-			virt_text = { { c.preedit, "IncSearch" } },
-			virt_text_pos = "inline",
-		})
 		if #c.candidates == 0 then
 			return
 		end

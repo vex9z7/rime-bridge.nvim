@@ -9,7 +9,7 @@ find_library(RIME_LIBRARY NAMES rime)
 if(NOT RIME_INCLUDE_DIR OR NOT RIME_LIBRARY)
   message(FATAL_ERROR "System librime development files missing. Install the Rime development package (Ubuntu: librime-dev); no dependencies are downloaded.")
 endif()
-find_package(nlohmann_json 3.2.0 CONFIG REQUIRED)
+find_package(nlohmann_json 3.6.0 CONFIG REQUIRED)
 
 add_executable(rime-bridge-worker native/worker.cpp)
 target_compile_features(rime-bridge-worker PRIVATE cxx_std_17)

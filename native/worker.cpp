@@ -51,7 +51,7 @@ struct Engine {
     CHECK(deploy); CHECK(create_session); CHECK(destroy_session);
     CHECK(process_key); CHECK(clear_composition); CHECK(get_context); CHECK(free_context);
     CHECK(get_commit); CHECK(free_commit); CHECK(get_schema_list); CHECK(free_schema_list);
-    CHECK(select_schema); CHECK(get_current_schema); CHECK(set_option);
+    CHECK(select_schema); CHECK(set_option);
     CHECK(select_candidate_on_current_page); CHECK(get_version); CHECK(find_module);
 #undef CHECK
     Dl_info loaded{};
@@ -72,9 +72,19 @@ struct Engine {
     session = api->create_session();
     require(session != 0, "cannot create session; check system Rime and deployed data");
   }
+  void initialize() {
+    api->initialize(&traits);
+    initialized = true;
+    // Deployer modules are separate from normal input modules.
+    auto deploy_traits = traits;
+    deploy_traits.modules = nullptr;
+    api->deployer_initialize(&deploy_traits);
+    new_session();
+  }
   void init(const json& q) {
     require(!attempted, "init allowed once per worker; restart after failure");
     attempted = true;
+    const bool require_lua = q.value("require_lua", false);
     if (q.contains("shared_dir")) shared = string_field(q, "shared_dir");
     require(fs::path(shared).is_absolute() && fs::is_directory(shared),
             "shared_dir must be an existing absolute Rime data directory: " + shared);
@@ -110,16 +120,10 @@ struct Engine {
     traits.modules = modules;
     api->setup(&traits);
     lua = api->find_module("lua") != nullptr;
-    require(!q.value("require_lua", false) || lua,
+    require(!require_lua || lua,
             "Lua module unavailable; install a compatible extension and set lua_plugin if needed");
     if (!lua) modules[3] = nullptr;
-    api->initialize(&traits);
-    initialized = true;
-    // Deployer modules are separate from normal input modules.
-    auto deploy_traits = traits;
-    deploy_traits.modules = nullptr;
-    api->deployer_initialize(&deploy_traits);
-    new_session();
+    initialize();
   }
   json info() {
     return {{"protocol", 1}, {"runtime", RIME_BRIDGE_VERSION},
@@ -150,6 +154,17 @@ struct Engine {
     }
     return out;
   }
+  json schemas() {
+    RimeSchemaList list{};
+    require(api->get_schema_list(&list), "cannot list deployed schemas");
+    json out = json::array();
+    try {
+      for (size_t i = 0; i < list.size; ++i)
+        out.push_back({{"id", str(list.list[i].schema_id)}, {"name", str(list.list[i].name)}});
+    } catch (...) { api->free_schema_list(&list); throw; }
+    api->free_schema_list(&list);
+    return out;
+  }
   json run(const json& q) {
     auto op = string_field(q, "op");
     int gen = number(q, "generation");
@@ -168,33 +183,17 @@ struct Engine {
       bool ok = api->deploy();
       // Lua modules can cache rime.lua: recreate engine state after deployment.
       api->finalize();
-      api->initialize(&traits);
-      auto deploy_traits = traits;
-      deploy_traits.modules = nullptr;
-      api->deployer_initialize(&deploy_traits);
-      new_session();
+      initialized = false;
+      initialize();
       require(ok, "deployment failed; check schema/component diagnostics and scheme files, then explicitly redeploy");
       return info();
     }
-    if (op == "schemas") {
-      RimeSchemaList list{};
-      require(api->get_schema_list(&list), "cannot list deployed schemas");
-      json out = json::array();
-      try {
-        for (size_t i = 0; i < list.size; ++i)
-          out.push_back({{"id", str(list.list[i].schema_id)}, {"name", str(list.list[i].name)}});
-      } catch (...) { api->free_schema_list(&list); throw; }
-      api->free_schema_list(&list);
-      return out;
-    }
+    if (op == "schemas") return schemas();
     if (op == "schema") {
       auto name = string_field(q, "schema");
-      RimeSchemaList list{};
-      require(api->get_schema_list(&list), "cannot list deployed schemas");
       bool found = false;
-      for (size_t i = 0; i < list.size; ++i)
-        if (name == str(list.list[i].schema_id)) found = true;
-      api->free_schema_list(&list);
+      for (const auto& schema : schemas())
+        if (schema["id"] == name) found = true;
       require(found, "schema is not in deployed schema_list: " + name);
       require(api->select_schema(session, name.c_str()), "cannot select schema: " + name);
       api->set_option(session, "ascii_mode", False);
@@ -236,6 +235,8 @@ int main() {
         shutdown = string_field(q, "op") == "shutdown";
         response["result"] = shutdown ? json::object() : engine.run(q);
         response["ok"] = true;
+      } catch (const json::exception&) {
+        response["error"] = "invalid JSON request or field type";
       } catch (const std::exception& e) { response["error"] = e.what(); }
       auto frame = response.dump(-1, ' ', false, json::error_handler_t::replace);
       require(frame.size() <= max_frame, "response exceeds 64 KiB");

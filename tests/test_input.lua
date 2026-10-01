@@ -89,6 +89,8 @@ local steps = {
 	function()
 		assert(line() == "", line())
 		assert(s.context.preedit ~= "" and visible(), "no visible composition")
+		local ns = vim.api.nvim_create_namespace("rime-bridge-" .. buf)
+		assert(#vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, {}) == 0, "inline preedit must not be rendered")
 		if blink then
 			local items = blink.get_items()
 			assert(#items == #s.context.candidates, "Blink filtered candidates")
