@@ -51,3 +51,23 @@ if(BUILD_TESTING AND NVIM_EXECUTABLE)
     -c "lua dofile('${CMAKE_CURRENT_SOURCE_DIR}/tests/test_input.lua')")
   set_tests_properties(lua.input PROPERTIES TIMEOUT 60)
 endif()
+
+set(RIME_BRIDGE_BLINK_DIR "" CACHE PATH "Existing blink.cmp checkout for optional integration tests (never downloaded)")
+if(BUILD_TESTING AND NVIM_EXECUTABLE AND RIME_BRIDGE_BLINK_DIR)
+  if(NOT EXISTS "${RIME_BRIDGE_BLINK_DIR}/lua/blink/cmp/init.lua")
+    message(FATAL_ERROR "RIME_BRIDGE_BLINK_DIR must point to an existing blink.cmp checkout")
+  endif()
+  foreach(suite IN ITEMS input isolation)
+    set(test_file test_input.lua)
+    if(suite STREQUAL "isolation")
+      set(test_file test_blink.lua)
+    endif()
+    add_test(NAME lua.blink_${suite} COMMAND "${CMAKE_COMMAND}" -E env
+      "RIME_BRIDGE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+      "RIME_BRIDGE_WORKER=$<TARGET_FILE:rime-bridge-worker>"
+      "RIME_TEST_BLINK=${RIME_BRIDGE_BLINK_DIR}"
+      "${NVIM_EXECUTABLE}" --headless -u NONE -i NONE
+      -c "lua dofile('${CMAKE_CURRENT_SOURCE_DIR}/tests/${test_file}')")
+    set_tests_properties(lua.blink_${suite} PROPERTIES TIMEOUT 60)
+  endforeach()
+endif()

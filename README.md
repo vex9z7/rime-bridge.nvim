@@ -2,8 +2,8 @@
 
 **Production implementation in progress, not a released input-method plugin.**
 This independent source tree starts with a system-Rime native worker and protocol
-regressions, Lua lifecycle/health checks and opt-in ordinary-buffer input. Blink
-integration and full release acceptance are pending. It does not create a scratch buffer or enable input in
+regressions, Lua lifecycle/health checks, opt-in ordinary-buffer input and a Blink
+adapter. Full release and real-configuration acceptance are pending. It does not create a scratch buffer or enable input in
 any existing Neovim configuration.
 
 ## Build the worker
@@ -93,8 +93,9 @@ While enabled:
   replaced by the user while active are not overwritten on cleanup.
 
 The prototype-independent input adapter temporarily owns these insert-mode keys.
-It does not yet cooperate with Blink, snippets or AI completions; use an isolated
-configuration with those disabled for this stage. No default F6 or global input
+The default native UI does not isolate competing completion. Use an isolated
+configuration for native mode, or the explicit Blink adapter below. Standalone
+AI virtual-text producers still require separate integration. No default F6 or global input
 mapping is installed. Do not enable by default in the normal configuration yet.
 
 start() initializes only the backend, without selecting/deploying a schema or
@@ -144,4 +145,70 @@ passes with an isolated Wanxiang Pure v18.0.15 directory (exit 0, explicit PASS)
 The tests include forced timeout/restart and worker death; error notifications in
 that test output are expected. Lua formatting/lint checks pass. This evidence is
 headless input, not a demonstration in the user's active editor, and does not
-validate Blink/AI coexistence, ARM64 or language-model effectiveness.
+validate AI virtual-text coexistence, ARM64 or language-model effectiveness.
+Blink-specific evidence follows below.
+
+
+## Optional Blink adapter
+
+Tested against blink.cmp **v1.10.2**, commit
+`78336bc89ee5365633bcf754d93df01678b5c08f`, with its Lua fuzzy matcher. Native UI
+remains the default and does not require Blink. For Blink, set `ui = "blink"` in
+rime_bridge.setup and wrap the complete Blink options **before** Blink setup:
+
+```lua
+require("rime_bridge").setup({
+  worker = "/absolute/path/to/rime-bridge-worker",
+  user_dir = "/absolute/path/to/dedicated-rime-data",
+  schema = "wanxiang_pure",
+  ui = "blink",
+})
+local opts = { fuzzy = { implementation = "lua" } } -- your existing Blink options
+require("blink.cmp").setup(require("rime_bridge.blink").options(opts))
+```
+
+With Lazy's opts callback, return rime_bridge.blink.options(opts) after other
+customizations. The helper copies options rather than mutating your input table.
+Do not call Blink setup twice or use only the provider without the isolation
+configuration. Unknown keymap presets are rejected rather than silently remapped.
+
+In the enabled buffer's Insert mode, the helper reserves Blink for Rime, even
+between compositions: ordinary providers, auto-insert previews, ghost text and
+custom accept/snippet key chains are suppressed. Per-filetype sources and delayed
+provider results are guarded as well. Disable Rime or leave its buffer to restore
+normal completion. This conservative Chinese-mode boundary avoids completion
+races around composition start/commit; it is not a fine-grained mixed-mode policy.
+
+Rime candidates keep engine order, including after an existing text prefix;
+Blink fuzzy matching must not reorder/filter Chinese candidates based on that
+prefix. Selecting a candidate, including through Blink's source execute API,
+sends its page index to the worker. The adapter never invokes Blink's default
+text insertion. Session/generation/revision checks reject stale candidate items.
+Ctrl-n/p navigate Rime, Ctrl-y accepts, Ctrl-e cancels, and Space/Enter/digits
+retain the normal input adapter's behavior. Source refresh uses public Blink
+show/select APIs; no private runtime configuration or event emitters are patched.
+
+This isolates Blink providers and wrapped key chains, **not arbitrary external
+plugins**. In particular Minuet's independently rendered virtual text and other
+standalone AI producers are not claimed integrated. Real LazyVim configuration
+activation, snippets/AI integration and a live user-session trial remain pending.
+
+### Blink tests
+
+Provide an existing pinned checkout; builds/tests never download it:
+
+```sh
+cmake -S . -B build -DRIME_BRIDGE_BLINK_DIR=/absolute/path/to/blink.cmp
+ctest --test-dir build --output-on-failure
+```
+
+The five-test suite passes on the host, adding full Blink real-key regression and
+isolation tests. The latter starts a delayed foreign provider, checks prefix and
+engine ordering, freezes the worker to prove Blink cannot insert the label before
+an engine commit, rejects stale items and verifies ordinary completion restoration.
+The same Blink real-key regression also passes against isolated Wanxiang Pure
+v18.0.15 (exit 0, explicit PASS). These are headless tests, not a live-session demo.
+
+References: [public source interface](https://cmp.saghen.dev/development/source-boilerplate),
+[configuration](https://cmp.saghen.dev/configuration/reference), and the
+[tested public API implementation](https://github.com/Saghen/blink.cmp/blob/78336bc89ee5365633bcf754d93df01678b5c08f/lua/blink/cmp/init.lua).

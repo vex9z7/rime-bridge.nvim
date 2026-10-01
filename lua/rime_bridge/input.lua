@@ -1,12 +1,17 @@
 -- Ordinary-buffer adapter: temporary input hooks; never creates or resets user buffers.
 local M = {}
+local instance = 0
 local function keys(s)
 	return vim.api.nvim_replace_termcodes(s, true, false, true)
 end
-function M.attach(client)
+function M.attach(client, ui)
 	local buf = vim.api.nvim_get_current_buf()
 	assert(vim.bo[buf].buftype == "" and vim.bo[buf].modifiable, "Enable Rime in a modifiable ordinary buffer")
+	instance = instance + 1
 	local s = {
+		ui = ui,
+		revision = 0,
+		instance = instance,
 		buf = vim.api.nvim_get_current_buf(),
 		win = vim.api.nvim_get_current_win(),
 		generation = client.generation or 0,
@@ -25,6 +30,9 @@ function M.attach(client)
 	end
 	local ns = vim.api.nvim_create_namespace("rime-bridge-" .. s.buf)
 	local function hide()
+		if ui == "blink" then
+			require("rime_bridge.blink").hide()
+		end
 		if vim.api.nvim_buf_is_valid(s.buf) then
 			vim.api.nvim_buf_clear_namespace(s.buf, ns, 0, -1)
 		end
@@ -59,6 +67,10 @@ function M.attach(client)
 			virt_text_pos = "inline",
 		})
 		if #c.candidates == 0 then
+			return
+		end
+		if ui == "blink" then
+			require("rime_bridge.blink").show(s)
 			return
 		end
 		if not s.menu or not vim.api.nvim_buf_is_valid(s.menu) then
@@ -99,6 +111,9 @@ function M.attach(client)
 		s.pending = 0
 		s.context = { preedit = "", candidates = {} }
 		s.client:cancel_queued()
+		if s.finish_selection then
+			vim.schedule(s.finish_selection)
+		end
 		local generation = s.generation
 		local function clear()
 			if s.closed or generation ~= s.generation then
@@ -114,7 +129,8 @@ function M.attach(client)
 		end
 	end
 	s.cancel = cancel
-	local function input(key, fallback)
+	local function input(key, fallback, op, done)
+		s.revision = s.revision + 1
 		if s.pending == 0 and s.context.preedit == "" then
 			anchor()
 		end
@@ -125,7 +141,7 @@ function M.attach(client)
 			if s.closed or gen ~= s.generation then
 				return
 			end
-			s.client:request("key", gen, { key = key }, function(result)
+			s.client:request(op or "key", gen, op == "select" and { index = key } or { key = key }, function(result)
 				if gen ~= s.generation then
 					return
 				end
@@ -156,14 +172,50 @@ function M.attach(client)
 				end
 				s.context = result
 				render()
+				if done then
+					done()
+				end
 			end)
 		end)
+	end
+	s.key = input
+	function s.select(index, generation, revision, owner, done)
+		if
+			s.closed
+			or s.pending ~= 0
+			or not valid()
+			or s.context.preedit == ""
+			or generation ~= s.generation
+			or revision ~= s.revision
+			or owner ~= s.instance
+		then
+			return false
+		end
+		local called = false
+		local function finish()
+			if called then
+				return
+			end
+			called = true
+			if s.finish_selection == finish then
+				s.finish_selection = nil
+			end
+			if done then
+				done()
+			end
+		end
+		s.finish_selection = finish
+		input(index, "", "select", finish)
+		return true
 	end
 	for code = 32, 126 do
 		local char = string.char(code)
 		map("i", char == "<" and "<lt>" or char, function()
 			if not s.ready or not s.enabled or vim.o.paste or not vim.bo[s.buf].modifiable then
 				return char
+			end
+			if ui == "blink" and char == " " and require("rime_bridge.blink").accept() then
+				return ""
 			end
 			input(
 				(s.pending > 0 or s.context.preedit ~= "") and (char == "=" and 0xff56 or char == "-" and 0xff55)
@@ -182,6 +234,9 @@ function M.attach(client)
 		map("i", lhs, function()
 			if not s.ready or not s.enabled or (s.pending == 0 and s.context.preedit == "") then
 				return keys(lhs)
+			end
+			if ui == "blink" and lhs == "<CR>" and require("rime_bridge.blink").accept() then
+				return ""
 			end
 			input(spec[1], spec[2])
 			return ""

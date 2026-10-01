@@ -1,5 +1,45 @@
 -- Isolated ordinary-file-buffer regression. All composing uses nvim_input.
 vim.opt.runtimepath:prepend(assert(vim.env.RIME_BRIDGE_SOURCE, "source required"))
+local blink
+if vim.env.RIME_TEST_BLINK then
+	vim.opt.runtimepath:prepend(vim.env.RIME_TEST_BLINK)
+	blink = require("blink.cmp")
+	package.preload["rime_test_foreign"] = function()
+		return {
+			new = function()
+				return {
+					get_completions = function(_, _, callback)
+						vim.defer_fn(function()
+							callback({
+								items = { { label = "FOREIGN", kind = 15, insertText = "UNWANTED" } },
+								is_incomplete_forward = true,
+								is_incomplete_backward = true,
+							})
+						end, 500)
+					end,
+				}
+			end,
+		}
+	end
+	blink.setup(require("rime_bridge.blink").options({
+		fuzzy = { implementation = "lua" },
+		keymap = {
+			preset = vim.env.RIME_TEST_BLINK_PRESET or "default",
+			["<C-y>"] = {
+				function()
+					assert(not require("rime_bridge.blink").active(), "foreign accept hook ran during Rime")
+				end,
+				"select_and_accept",
+				"fallback",
+			},
+		},
+		sources = {
+			default = { "foreign" },
+			providers = { foreign = { name = "Foreign", module = "rime_test_foreign" } },
+		},
+		completion = { list = { selection = { auto_insert = true } }, ghost_text = { enabled = true } },
+	}))
+end
 local plugin = require("rime_bridge")
 local user = vim.env.RIME_TEST_USER_DIR or vim.fn.tempname()
 if not vim.env.RIME_TEST_USER_DIR then
@@ -19,6 +59,7 @@ local original = function()
 end
 vim.keymap.set("i", "q", original, { buffer = buf, expr = true })
 plugin.setup({
+	ui = blink and "blink" or "native",
 	worker = assert(vim.env.RIME_BRIDGE_WORKER, "worker required"),
 	user_dir = user,
 	schema = vim.env.RIME_TEST_SCHEMA or "input_fixture",
@@ -32,6 +73,9 @@ end
 local function line()
 	return vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
 end
+local function visible()
+	return blink and blink.is_menu_visible() or s.popup ~= nil
+end
 local expected, page, before, other, paused_pid
 local timeout_wait = 0
 local steps = {
@@ -44,8 +88,19 @@ local steps = {
 	end,
 	function()
 		assert(line() == "", line())
-		assert(s.context.preedit ~= "" and s.popup, "no visible composition")
-		key(" ")
+		assert(s.context.preedit ~= "" and visible(), "no visible composition")
+		if blink then
+			local items = blink.get_items()
+			assert(#items == #s.context.candidates, "Blink filtered candidates")
+			for i, item in ipairs(items) do
+				assert(
+					item.source_id == "rime_bridge" and item.label == s.context.candidates[i].text,
+					"Blink order/isolation mismatch"
+				)
+			end
+			assert(not blink.is_ghost_text_visible(), "ghost text leaked")
+		end
+		key(blink and "<C-y>" or " ")
 	end,
 	function()
 		assert(line() == "你好", line())
@@ -127,7 +182,12 @@ local steps = {
 		key("<CR>")
 	end,
 	function()
-		assert(line() == expected, "Enter must commit selected candidate")
+		assert(line() == expected, "Enter must commit selected candidate: " .. vim.inspect({
+			line = line(),
+			expected = expected,
+			ctx = s.context,
+			selected = blink and blink.get_selected_item(),
+		}))
 		key("<F6>")
 	end,
 	function()
@@ -155,7 +215,7 @@ local steps = {
 		assert(vim.uv.kill(vim.fn.jobpid(s.client.job), "sigcont") == 0, "cannot resume child")
 	end,
 	function()
-		assert(line() == before and not s.popup, "delayed response leaked after cancel")
+		assert(line() == before and not visible(), "delayed response leaked after cancel")
 		key("A")
 	end,
 	function()
@@ -166,7 +226,7 @@ local steps = {
 		key("<Left>")
 	end,
 	function()
-		assert(s.context.preedit == "" and not s.popup, "cursor movement did not cancel")
+		assert(s.context.preedit == "" and not visible(), "cursor movement did not cancel")
 		key("<End>nihao")
 	end,
 	function()
@@ -183,7 +243,7 @@ local steps = {
 		other = vim.api.nvim_get_current_buf()
 	end,
 	function()
-		assert(s.context.preedit == "" and not s.popup, "buffer switch did not cancel")
+		assert(s.context.preedit == "" and not visible(), "buffer switch did not cancel")
 		assert(vim.api.nvim_buf_get_lines(other, 0, 1, false)[1] == "", "text leaked to another buffer")
 		assert(line() == before, "text leaked into original buffer")
 		vim.api.nvim_set_current_buf(buf)
@@ -203,7 +263,7 @@ local steps = {
 		assert(s.error:find("timeout"), "expected timeout error")
 		vim.uv.kill(paused_pid, "sigcont")
 		paused_pid = nil
-		assert(not s.popup and line() == before, "timeout leaked UI/text")
+		assert(not visible() and line() == before, "timeout leaked UI/text")
 	end,
 	function()
 		plugin.enable()
@@ -221,7 +281,7 @@ local steps = {
 		vim.fn.jobstop(s.client.job)
 	end,
 	function()
-		assert(s.error and not s.ready and not s.popup, "worker failure not isolated")
+		assert(s.error and not s.ready and not visible(), "worker failure not isolated")
 		key("z")
 	end,
 	function()

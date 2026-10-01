@@ -33,6 +33,13 @@ function M.check()
 	else
 		health.info("Worker has not initialized; executable presence alone does not verify dependencies")
 	end
-	health.warn("Ordinary-buffer input is opt-in; Blink/completion isolation is not yet implemented")
+	if config.ui == "blink" then
+		if require("rime_bridge.blink").ready() then
+			health.ok("Blink options wrapper configured")
+		else
+			health.error("Configure Blink with rime_bridge.blink.options before enabling input")
+		end
+	end
+	health.warn("Real-configuration/standalone AI virtual-text integration remains unvalidated")
 end
 return M

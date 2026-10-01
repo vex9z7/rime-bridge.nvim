@@ -54,6 +54,7 @@ function M.setup(opts)
 	assert(type(opts) == "table", "rime_bridge.setup expects a table")
 	local next_config = vim.tbl_extend("force", {
 		worker = "rime-bridge-worker",
+		ui = "native",
 		schema = "wanxiang_pure",
 		require_lua = false,
 	}, opts)
@@ -71,6 +72,7 @@ function M.setup(opts)
 		)
 	end
 	assert(type(next_config.require_lua) == "boolean", "require_lua must be boolean")
+	assert(next_config.ui == "native" or next_config.ui == "blink", "ui must be native or blink")
 	M.stop()
 	config = next_config
 	vim.api.nvim_create_user_command("RimeInfo", function()
@@ -148,6 +150,11 @@ function M.disable()
 end
 
 function M.enable()
+	assert(config, "Call setup first")
+	if config.ui == "blink" then
+		assert(require("rime_bridge.blink").ready(), "Wrap Blink setup with rime_bridge.blink.options first")
+		require("blink.cmp").cancel()
+	end
 	M.disable()
 	local token, buf, win = serial, vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
 	assert(vim.bo[buf].buftype == "" and vim.bo[buf].modifiable, "Enable Rime in a modifiable ordinary buffer")
@@ -166,7 +173,7 @@ function M.enable()
 			then
 				return
 			end
-			input = require("rime_bridge.input").attach(current)
+			input = require("rime_bridge.input").attach(current, config.ui)
 		end)
 	end)
 end
