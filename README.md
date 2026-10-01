@@ -2,8 +2,8 @@
 
 **Production implementation in progress, not a released input-method plugin.**
 This independent source tree starts with a system-Rime native worker and protocol
-regressions. Lua setup, ordinary-buffer input, Blink integration and release
-acceptance are pending. It does not create a scratch buffer or enable input in
+regressions and a Lua lifecycle/health foundation. Ordinary-buffer input, Blink
+integration and release acceptance are pending. It does not create a scratch buffer or enable input in
 any existing Neovim configuration.
 
 ## Build the worker
@@ -22,8 +22,7 @@ cmake --install build --prefix "$HOME/.local"
 ```
 
 This installs `rime-input-worker` in the selected prefix's bin directory, not
-librime or Lua files. Neovim plugin managers will install Lua when that layer is
-implemented. Use `-DBUILD_TESTING=OFF` for builds without the Python test runner.
+librime or Lua files. Neovim plugin managers install the Lua modules; CMake does not install them. Use `-DBUILD_TESTING=OFF` for builds without the Python test runner.
 A local build is not a universally portable binary.
 
 ## Data and scope
@@ -57,3 +56,38 @@ isolated local prefix passed on Ubuntu 22.04 x86_64 with GCC 11.4, system librim
 The development container without librime-dev separately exercises the actionable
 configure-time missing-dependency error. Normal-buffer/real-key production tests
 have not yet run; historical scratch results are not substituted for those gates.
+
+
+## Lua foundation (not input activation yet)
+
+Neovim >=0.10 is required; the actual tested host is Neovim 0.12.5.
+Put this repository on runtimepath through your plugin manager, then:
+
+```lua
+require("rime_input").setup({
+  worker = "/absolute/path/to/rime-input-worker", -- defaults to PATH lookup
+  user_dir = "/absolute/path/to/dedicated-rime-data",
+  schema = "wanxiang",
+})
+```
+
+setup does not spawn a process, create buffers, deploy data or install mappings.
+For backend diagnostics only, call `require("rime_input").start()` explicitly;
+this initializes the engine, checks protocol 1 and reports `initialized`, not
+input-ready. It does not select/deploy a schema. `:RimeInfo` reports state;
+`:checkhealth rime_input` inspects configuration/runtime without launching a worker.
+Use `require("rime_input").stop()` to close it; editor exit closes it as well.
+Engine stderr is discarded by the default Lua client to avoid retaining input
+content; more actionable privacy-safe engine diagnostics remain a future task.
+
+CTest adds lua.foundation when Neovim is found (or specified with
+-DNVIM_EXECUTABLE=/path/to/nvim); absence is reported, not counted as a pass.
+Both worker.protocol and lua.foundation passed on the actual host. The latter
+checks setup isolation, incompatible protocol rejection, real worker handshake,
+shutdown, configuration isolation and missing-executable errors. This is not an
+editor key/normal-buffer acceptance test.
+
+Repeatability check: after making edited test-fixture mtimes distinct for the old
+engine's deployment cache, `ctest --repeat until-fail:5` passed both suites five
+times on the host (exit 0). An earlier rapid-edit run missed the newly added
+schema; this fixture correction does not claim a production deployment-cache fix.

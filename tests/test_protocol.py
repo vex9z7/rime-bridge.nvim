@@ -154,7 +154,11 @@ translator:
 end
 """)
     (user / "fixture.custom.yaml").write_text("patch:\n  menu/page_size: 3\n")
+    # Old system Rime compares configuration mtimes at whole-second precision.
+    # Advance the edited fixture explicitly rather than sleeping/retrying a test.
+    previous_mtime = custom.stat().st_mtime
     custom.write_text("patch:\n  schema_list:\n    - schema: luna_pinyin_simp\n    - schema: fixture\n")
+    os.utime(custom, (previous_mtime + 2, previous_mtime + 2))
     original = custom.read_bytes()
     c.call("deploy")
     c.call("schema", schema="fixture")
@@ -179,12 +183,15 @@ end
     # Deployment errors are explicit and user edits are not replaced.
     broken = user / "fixture.schema.yaml"
     saved = broken.read_bytes()
+    previous_mtime = broken.stat().st_mtime
     broken.write_text("schema: [invalid YAML")
+    os.utime(broken, (previous_mtime + 2, previous_mtime + 2))
     c = Client(user)
     c.init()
     assert "deployment failed" in c.call("deploy", ok=False)
     assert broken.read_text() == "schema: [invalid YAML"
     broken.write_bytes(saved)
+    os.utime(broken, (previous_mtime + 4, previous_mtime + 4))
     c.call("deploy")
     c.close()
     # Invalid JSON must be framed as an error, without poisoning the next request.

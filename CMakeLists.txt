@@ -28,3 +28,17 @@ if(BUILD_TESTING)
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_protocol.py" "$<TARGET_FILE:rime-input-worker>" --no-lua)
   set_tests_properties(worker.protocol PROPERTIES TIMEOUT 120)
 endif()
+
+if(BUILD_TESTING)
+  find_program(NVIM_EXECUTABLE NAMES nvim)
+  if(NVIM_EXECUTABLE)
+    add_test(NAME lua.foundation COMMAND "${CMAKE_COMMAND}" -E env
+      "RIME_INPUT_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+      "RIME_INPUT_WORKER=$<TARGET_FILE:rime-input-worker>"
+      "${NVIM_EXECUTABLE}" --headless -u NONE -i NONE
+      -c "lua dofile('${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lua.lua')")
+    set_tests_properties(lua.foundation PROPERTIES TIMEOUT 30)
+  else()
+    message(STATUS "Neovim not found: lua.foundation test unavailable; only native tests will run")
+  endif()
+endif()
