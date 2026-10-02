@@ -1,6 +1,6 @@
 # Source-release readiness
 
-This is a source-only Linux x86_64 release path. Do not publish a worker binary
+This is a source-only Linux x86_64 and ARM64 build path. Do not publish a worker binary
 as portable across distributions: users compile against their installed librime.
 Version Lua and the worker together; protocol mismatch fails closed.
 
@@ -28,12 +28,12 @@ system Lua extension and may require an explicit lua_plugin path.
 ## CI
 
 `.github/workflows/build.yml` is a separate worker-only gate for Ubuntu 22.04 and
-24.04 x86_64 containers. It checks a clean build without system JSON, disconnected
+24.04 x86_64 and ARM64 containers. It checks a clean build without system JSON, disconnected
 source reuse, install contents/license and an installed-worker shutdown exchange.
 It does not require the editor integration tests to pass before reporting build
 results. A configured workflow is not evidence of a successful hosted run.
 
-.github/workflows/ci.yml builds on Ubuntu 22.04 x86_64, installing system
+.github/workflows/ci.yml builds on Ubuntu 22.04 x86_64 and ARM64, installing system
 packages **on the ephemeral CI runner only**. Action/dependency commits and the
 Neovim download digest are fixed. It runs six fixed-fixture editor/protocol tests,
 Minuet's tests and isolated-prefix install, retaining CTest output for seven days.

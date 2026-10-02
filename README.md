@@ -10,7 +10,7 @@ and [dependency/data boundaries](NOTICE.md).
 ## Build the worker
 
 Linux, a C++17 compiler, CMake >=3.16 and system librime development files are
-required. Install system dependencies yourself (Ubuntu: `g++ cmake librime-dev`).
+required. Install system dependencies yourself (Ubuntu: `g++ make cmake librime-dev`).
 CMake never downloads or builds librime.
 
 CMake FetchContent downloads nlohmann-json **3.12.0** into `build/_deps/`, with a
@@ -54,20 +54,21 @@ then run the build, CTest and isolated-prefix install checks.
 
 ## Build CI
 
-`.github/workflows/build.yml` independently checks the worker on Linux x86_64 in
+`.github/workflows/build.yml` independently checks the worker on Linux x86_64 and ARM64 in
 clean Ubuntu 22.04 and 24.04 containers for main pushes, pull requests and manual
 runs. It installs only build dependencies (no system JSON package or editor),
 then checks FetchContent configure/build, a disconnected build using pre-fetched
 sources, isolated installation, the JSON license and an installed-worker protocol
 smoke test. `BUILD_TESTING=OFF` keeps this gate independent of Neovim, Blink,
 Minuet and scheme fixtures. The existing `ci.yml` retains the full integration
-regressions. These source-build checks do not certify portable binaries or ARM64.
+regressions on both native architectures. These checks do not certify portable
+binaries or arbitrary schemes.
 
 ## Data and scope
 
 Users own the system engine and a separate writable Rime user directory. The
 first-version scheme baseline is upstream Wanxiang Pure v18.0.15; no dictionaries,
-models or personal learning data are bundled. Full Wanxiang/Ice, ARM64 validation
+models or personal learning data are bundled. Full Wanxiang/Ice, live ARM64 input-experience evaluation
 and cross-distribution prebuilt binaries are deferred. Model effectiveness is
 not verified. This worker does not seed or replace configuration.
 

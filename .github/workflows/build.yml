@@ -31,7 +31,7 @@ jobs:
         run: |
           test "$(uname -m)" = "${{ matrix.platform.arch }}"
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git g++ cmake librime-dev
+          apt-get install -y --no-install-recommends ca-certificates git g++ make cmake librime-dev
           test ! -e /usr/include/nlohmann/json.hpp
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

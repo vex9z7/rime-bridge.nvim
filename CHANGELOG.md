@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Run native Linux x86_64 and ARM64 build/install checks on Ubuntu 22.04/24.04
+  and full editor/protocol regressions on Ubuntu 22.04 for both architectures.
+- Explicitly install make in clean build CI containers; CMake alone does not
+  provide the default Unix Makefiles build tool.
+
 - Add an independent Ubuntu 22.04/24.04 worker build CI gate covering fetched and
   disconnected-source builds, isolated installation and protocol startup/shutdown.
 
