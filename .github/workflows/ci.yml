@@ -1,4 +1,4 @@
-name: Linux x86_64 source build
+name: Linux integration tests
 on:
   push:
     branches: [main]
@@ -10,7 +10,20 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    name: Integration ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+            nvim_arch: x86_64
+            nvim_sha256: b2f91117be5b5ea39edd7297156dc2a4a8df4add6c95a90809a8df19e7ab6f52
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+            nvim_arch: arm64
+            nvim_sha256: ea4f9a31b11cc1477ff014aebb7b207684e7280f94ffa97abdab6cacd9b98519
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -18,14 +31,15 @@ jobs:
           persist-credentials: false
       - name: Install system build and fixture dependencies
         run: |
+          test "$(uname -m)" = "${{ matrix.arch }}"
           sudo apt-get update
           sudo apt-get install -y g++ cmake librime-dev librime-data rime-data-luna-pinyin python3
       - name: Install fixed Neovim for tests
         run: |
-          curl --fail --location --retry 3 -o nvim.tar.gz https://github.com/neovim/neovim/releases/download/v0.11.5/nvim-linux-x86_64.tar.gz
-          echo 'b2f91117be5b5ea39edd7297156dc2a4a8df4add6c95a90809a8df19e7ab6f52  nvim.tar.gz' | sha256sum --check
+          curl --fail --location --retry 3 -o nvim.tar.gz https://github.com/neovim/neovim/releases/download/v0.11.5/nvim-linux-${{ matrix.nvim_arch }}.tar.gz
+          echo '${{ matrix.nvim_sha256 }}  nvim.tar.gz' | sha256sum --check
           tar -xzf nvim.tar.gz -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/nvim-linux-${{ matrix.nvim_arch }}/bin" >> "$GITHUB_PATH"
       - name: Fixed Blink dependency
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -59,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ctest-linux-x86_64
+          name: ctest-linux-${{ matrix.arch }}
           path: build/Testing/Temporary/LastTest.log
           if-no-files-found: ignore
           retention-days: 7

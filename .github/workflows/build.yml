@@ -10,13 +10,16 @@ permissions:
 
 jobs:
   build:
-    name: Ubuntu ${{ matrix.ubuntu }} x86_64
-    runs-on: ubuntu-24.04
+    name: Ubuntu ${{ matrix.ubuntu }} ${{ matrix.platform.arch }}
+    runs-on: ${{ matrix.platform.runner }}
     container: ubuntu:${{ matrix.ubuntu }}
     strategy:
       fail-fast: false
       matrix:
         ubuntu: ['22.04', '24.04']
+        platform:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
     timeout-minutes: 15
     defaults:
       run:
@@ -26,6 +29,7 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          test "$(uname -m)" = "${{ matrix.platform.arch }}"
           apt-get update
           apt-get install -y --no-install-recommends ca-certificates git g++ cmake librime-dev
           test ! -e /usr/include/nlohmann/json.hpp
