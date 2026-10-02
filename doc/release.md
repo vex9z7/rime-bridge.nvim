@@ -4,7 +4,7 @@ This is a source-only Linux x86_64 release path. Do not publish a worker binary
 as portable across distributions: users compile against their installed librime.
 Version Lua and the worker together; protocol mismatch fails closed.
 
-## Measured baseline
+## Measured v0.1.0 baseline (historical)
 
 | Component | Measured |
 | --- | --- |
@@ -27,12 +27,20 @@ system Lua extension and may require an explicit lua_plugin path.
 
 ## CI
 
+`.github/workflows/build.yml` is a separate worker-only gate for Ubuntu 22.04 and
+24.04 x86_64 containers. It checks a clean build without system JSON, disconnected
+source reuse, install contents/license and an installed-worker shutdown exchange.
+It does not require the editor integration tests to pass before reporting build
+results. A configured workflow is not evidence of a successful hosted run.
+
 .github/workflows/ci.yml builds on Ubuntu 22.04 x86_64, installing system
 packages **on the ephemeral CI runner only**. Action/dependency commits and the
 Neovim download digest are fixed. It runs six fixed-fixture editor/protocol tests,
 Minuet's tests and isolated-prefix install, retaining CTest output for seven days.
 AI network calls are replaced only in tests. There are no user data or model
-downloads in CI. CMake itself never installs/downloads dependencies.
+downloads in CI. Current unreleased CMake fetches pinned JSON sources into the
+build tree; it does not install system dependencies or download/build librime. The v0.1.0 baseline
+above predates this change and used system JSON headers.
 
 A local reproduction is not a hosted CI result. Record the hosted run URL and
 conclusion before tagging. Large Pure integration remains an explicit, isolated
@@ -60,7 +68,27 @@ and remote tag verification in the parent implementation evidence; do not advanc
 a tag to another commit after publishing it.
 
 MIT was explicitly selected by the owner; see LICENSE and NOTICE.md.
-The project links user-installed librime and nlohmann-json; their own licenses
-still apply. Wanxiang dictionaries/models remain separate upstream downloads
+The project links user-installed librime and compiles fetched JSON headers;
+their own licenses still apply. Wanxiang dictionaries/models remain separate upstream downloads
 under their upstream terms, not assets redistributed by this plugin. Blink and
 Minuet are optional dependencies, not copied into the source distribution.
+
+## Unreleased build-layout verification (2026-10-02)
+
+The src/ + cmake/ layout and pinned FetchContent JSON 3.12.0 were checked in the
+Debian 13 development container (GCC 14.2, extracted librime 1.13.1 packages,
+Neovim 0.11.5). No host system packages were changed. Online configure/build,
+fresh offline-source configure/build, missing-librime diagnostics and isolated
+installation passed. Installation contained only the worker and the unchanged
+upstream JSON license; compilation used JSON headers from build/_deps/.
+
+Under PRoot data-directory bindings, worker.protocol, lua.foundation and
+lua.minuet_isolation passed. lua.input and lua.blink_input failed the stopped-worker
+timeout assertion; lua.blink_isolation failed the paused-worker commit assertion.
+The unchanged e1e167a source, separately built against the same dependencies,
+reproduced all three failures at the same assertions. This does not establish a
+fully passing editor regression run; signal handling under isolation needs to be
+excluded by rerunning on the normal host. The host Neovim TCP endpoint reset the
+connection during this round, so no new host or visible-session acceptance is
+claimed. Existing v0.1.0 measurements above remain historical, not evidence for
+this unreleased build change.

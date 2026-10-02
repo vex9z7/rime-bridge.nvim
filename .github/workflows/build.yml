@@ -1,0 +1,64 @@
+name: Worker build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Ubuntu ${{ matrix.ubuntu }} x86_64
+    runs-on: ubuntu-24.04
+    container: ubuntu:${{ matrix.ubuntu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['22.04', '24.04']
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install only build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git g++ cmake librime-dev
+          test ! -e /usr/include/nlohmann/json.hpp
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Configure and build without editor or test dependencies
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build --parallel 2
+          test -x build/rime-bridge-worker
+          test -f build/_deps/nlohmann_json-src/include/nlohmann/json.hpp
+      - name: Build from pre-fetched sources without another download
+        run: |
+          cmake -S . -B build-offline -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+            -DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON="$PWD/build/_deps/nlohmann_json-src" \
+            -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+          cmake --build build-offline --parallel 2
+          test -x build-offline/rime-bridge-worker
+      - name: Install and smoke-test the installed worker
+        run: |
+          cmake --install build --prefix "$RUNNER_TEMP/rime-install"
+          test -x "$RUNNER_TEMP/rime-install/bin/rime-bridge-worker"
+          cmp build/_deps/nlohmann_json-src/LICENSE.MIT \
+            "$RUNNER_TEMP/rime-install/share/licenses/rime-bridge/nlohmann-json-LICENSE.MIT"
+          test ! -d "$RUNNER_TEMP/rime-install/include"
+          test ! -d "$RUNNER_TEMP/rime-install/lib"
+          response=$(printf '%s\n' '{"id":1,"generation":0,"op":"shutdown"}' | \
+            "$RUNNER_TEMP/rime-install/bin/rime-bridge-worker")
+          test "$response" = '{"generation":0,"id":1,"ok":true,"result":{}}'
+      - name: Record toolchain
+        run: |
+          cmake --version
+          g++ --version
+          ldd --version
+          dpkg-query -W librime-dev

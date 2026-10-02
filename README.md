@@ -9,12 +9,17 @@ and [dependency/data boundaries](NOTICE.md).
 
 ## Build the worker
 
-Linux, a C++17 compiler, CMake >=3.16, system librime development files and
-nlohmann-json >=3.6.0 headers/CMake package are required. Tests additionally need Python3
-and a Rime shared-data directory at /usr/share/rime-data with luna_pinyin_simp
-for the native protocol suite (Ubuntu: rime-data-luna-pinyin). Ubuntu package names:
-`g++ cmake librime-dev nlohmann-json3-dev librime-data python3`.
-Install dependencies yourself; CMake does not download them or build librime.
+Linux, a C++17 compiler, CMake >=3.16 and system librime development files are
+required. Install system dependencies yourself (Ubuntu: `g++ cmake librime-dev`).
+CMake never downloads or builds librime.
+
+CMake FetchContent downloads nlohmann-json **3.12.0** into `build/_deps/`, with a
+fixed SHA256 and HTTPS certificate verification. No system JSON package is needed.
+The first configure needs network access and trusted CA certificates. JSON is
+header-only: its code is compiled into the worker, not loaded as a runtime library.
+Tests additionally need Python3 and a Rime shared-data directory at
+`/usr/share/rime-data` with `luna_pinyin_simp` (Ubuntu:
+`python3 librime-data rime-data-luna-pinyin`).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -24,8 +29,39 @@ cmake --install build --prefix "$HOME/.local"
 ```
 
 This installs `rime-bridge-worker` in the selected prefix's bin directory, not
-librime or Lua files. Neovim plugin managers install the Lua modules; CMake does not install them. Use `-DBUILD_TESTING=OFF` for builds without the Python test runner.
+librime, JSON headers or Lua files. The JSON license is installed under
+`share/licenses/rime-bridge/`. Neovim plugin managers install the Lua modules;
+CMake does not install them. Use `-DBUILD_TESTING=OFF` for builds without the
+Python test runner.
 A local build is not a universally portable binary.
+
+## C++ project layout
+
+- `CMakeLists.txt`: project entry point and CTest registration.
+- `cmake/Dependencies.cmake`: system Rime target and pinned JSON acquisition.
+- `src/`: worker target and implementation; compile/link requirements are target-local.
+- `tests/`: protocol and editor regressions; `lua/`: Neovim modules.
+- `build/`: ignored generated files, downloaded dependency sources and worker binary.
+
+The worker remains at `build/rime-bridge-worker`, preserving plugin-manager build
+commands. There is no public C++ API, so no public `include/` tree is needed.
+For a fresh offline build, unpack the pinned JSON archive in advance and configure
+with `-DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=/absolute/path/to/json` (the directory
+containing its `CMakeLists.txt` and `LICENSE.MIT`). Verify the archive against the
+SHA256 in `cmake/Dependencies.cmake`; this source override bypasses downloading and
+its automatic hash check. Update the version and hash together when upgrading JSON,
+then run the build, CTest and isolated-prefix install checks.
+
+## Build CI
+
+`.github/workflows/build.yml` independently checks the worker on Linux x86_64 in
+clean Ubuntu 22.04 and 24.04 containers for main pushes, pull requests and manual
+runs. It installs only build dependencies (no system JSON package or editor),
+then checks FetchContent configure/build, a disconnected build using pre-fetched
+sources, isolated installation, the JSON license and an installed-worker protocol
+smoke test. `BUILD_TESTING=OFF` keeps this gate independent of Neovim, Blink,
+Minuet and scheme fixtures. The existing `ci.yml` retains the full integration
+regressions. These source-build checks do not certify portable binaries or ARM64.
 
 ## Data and scope
 
@@ -45,7 +81,7 @@ Native protocol handling and fixtures were extracted from the system-backed
 PoC at parent revision a06142d, not from a new engine implementation. Historical
 PoC sources remain unchanged. Tests here own independent copies and do not read
 parent-repository paths. The worker uses the official Rime C API and user-installed
-system dependencies, with no private library bundle.
+librime, with no private engine library bundle. JSON is fetched at build time.
 
 Protocol tests are not proof of normal-buffer/Blink input. See doc/protocol.md.
 Original plugin source is covered by the [MIT License](LICENSE), approved by the

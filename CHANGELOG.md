@@ -2,8 +2,14 @@
 
 ## Unreleased
 
-- Require nlohmann-json >=3.6.0, matching the worker API usage; remove an
-  unused Rime API requirement and share engine/session and schema-list cleanup.
+- Add an independent Ubuntu 22.04/24.04 worker build CI gate covering fetched and
+  disconnected-source builds, isolated installation and protocol startup/shutdown.
+
+- Organize C++ targets under src/ and dependency declarations under cmake/.
+- Fetch pinned nlohmann-json 3.12.0 with SHA256 verification instead of requiring
+  a system JSON package; retain system librime and the build-root worker path.
+  Install the JSON license without installing its headers or CMake package.
+- Remove an unused Rime API requirement and share engine/session and schema-list cleanup.
 - Reject malformed protocol input without echoing JSON payloads; validate the
   Lua requirement before initialization side effects.
 
