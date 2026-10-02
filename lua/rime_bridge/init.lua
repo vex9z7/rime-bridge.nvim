@@ -72,6 +72,7 @@ function M.status()
 	if client and client.diagnostics then
 		result.diagnostics = client.diagnostics.snapshot()
 	end
+	result.deployment = deploying and "running" or result.deployment
 	result.enabled = input ~= nil and not input.closed
 	result.buffer = result.enabled and input.buf or (wanted and wanted_buf or nil)
 	result.active = M.is_active()

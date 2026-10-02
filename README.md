@@ -41,6 +41,8 @@ once the worker and Pure data are prepared; Blink is optional.
 
 Linux, a C++17 compiler, CMake >=3.16 and system librime development files are
 required. Install system dependencies yourself (Ubuntu: `g++ make cmake librime-dev`).
+Engine initialization also needs a shared Rime data directory (Ubuntu:
+`librime-data` provides `/usr/share/rime-data`), or an explicit prepared `shared_dir`.
 CMake never downloads or builds librime.
 
 CMake FetchContent downloads nlohmann-json **3.12.0** into `build/_deps/`, with a
@@ -376,7 +378,14 @@ this is a verified regression test, not merely a green smoke test.
 2. With the original writer stopped, copy the scheme's source YAML, dictionary,
    OpenCC/Lua/model resources as required by its upstream documentation. Point
    `schema` at its schema ID and include that ID in `default.custom.yaml`'s
-   `patch.schema_list`. Changing the Lua option alone does not edit that list.
+   `patch.schema_list`. Changing the Lua option alone does not edit that list. For Pure, merge this into
+   your existing patch rather than overwriting the whole file:
+
+   ```yaml
+   patch:
+     schema_list:
+       - schema: wanxiang_pure
+   ```
 3. Keep personal `*.custom.yaml` patches and learned `*.userdb` data. Do not copy
    old `build/` caches or lock files as installation inputs. Custom schemes may
    need a compatible system Lua extension; Pure does not.
@@ -408,14 +417,18 @@ review upstream/custom changes manually rather than running this fresh-install
 example:
 
 ```sh
+(
+set -eu
 data="$HOME/.local/share/nvim/rime-bridge"
 test ! -e "$data" || { echo "Refusing to replace existing data"; exit 1; }
 download="$(mktemp -d)"
 curl --fail --location --retry 3 -o "$download/pure.zip" \
   https://github.com/amzxyz/rime-wanxiang/releases/download/v18.0.15/rime-wanxiang-pure.zip
 echo "582b6842ea6d4aebb5f6863df309f550a7104eb01fcfa6ae8d4dea88c3c2b31b  $download/pure.zip" | sha256sum --check
-mkdir -p "$data"
+mkdir -p "$(dirname "$data")"
+mkdir "$data" # Fail if another process created it while downloading; never merge implicitly.
 unzip -q "$download/pure.zip" -d "$data"
+)
 ```
 
 The measured test directory also contains the upstream

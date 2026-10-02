@@ -97,6 +97,20 @@ local function test()
 	require("rime_bridge.health").check()
 	assert(#requests == 0 and plugin.status().phase == "stopped", "health must be passive")
 	assert(table.concat(messages, "\n"):find("RimeCheck"), "runtime probe advice missing")
+	plugin.setup(vim.tbl_extend("force", options, { worker = "/explicit/missing" }))
+	messages = {}
+	vim.env.PATH = ""
+	require("rime_bridge.health").check()
+	local report = table.concat(messages, "\n")
+	assert(
+		report:find("not executable")
+			and report:find("Build tool missing: cmake")
+			and report:find("Build tool missing: make"),
+		"missing-build-tool diagnosis absent"
+	)
+	assert(#requests == 0, "health launched a worker")
+	vim.env.PATH = old_path
+	plugin.setup(options)
 	vim.health = original_health
 	local buffers = #vim.api.nvim_list_bufs()
 	plugin.check()
@@ -150,6 +164,7 @@ local function test()
 	plugin.stop()
 	assert(plugin.statusline() == "Rime:off")
 	plugin.deploy()
+	assert(plugin.status().deployment == "running", "deployment startup not reported")
 	local late = table.remove(requests, 1)
 	assert(late.op == "init")
 	plugin.stop()
