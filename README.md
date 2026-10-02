@@ -7,6 +7,36 @@ adapter. Real LazyVim integration has been tested separately. setup does not
 create a scratch buffer or automatically enable input. See [release notes](CHANGELOG.md)
 and [dependency/data boundaries](NOTICE.md).
 
+## Install with lazy.nvim / LazyVim
+
+Copy [examples/lazy.lua](examples/lazy.lua) into your plugin-spec directory. It
+contains the CMake build hook and the tested Blink wrapper; merge its Blink opts
+callback with your existing configuration rather than calling setup twice. The
+example pins the tested Blink version and uses its Lua matcher. The management
+regression loads this example and checks its provider/build configuration.
+
+Install the system build packages listed below yourself, then let the plugin
+manager run the build hook. The default dedicated data directory is
+`vim.fn.stdpath("data") .. "/rime-bridge"`; no directory or input mappings are
+created by setup. Prepare [scheme data](#reproducible-pure-data-preparation), run
+`:RimeDeploy`, wait for completion, then `:RimeCheck` and `<leader>uR` to enable.
+The plugin never downloads dictionaries, changes system packages or enables
+Chinese input automatically.
+
+Worker discovery, in order:
+
+1. Explicit `worker = "..."` (never silently replaced if missing/broken).
+2. This plugin's `build/rime-bridge-worker`.
+3. `rime-bridge-worker` on PATH.
+
+Discovery runs again at startup, so a build completed after setup is recognized.
+A present but non-executable plugin-local worker is reported, not silently
+replaced by an older PATH version. `:RimeInfo` reports the selected path/origin;
+`:checkhealth rime_bridge` gives the rebuild command and missing-tool hints.
+Use `user_dir`, `schema`, `shared_dir`, `worker` and `lua_plugin` overrides only
+when needed. For standalone native UI, `require("rime_bridge").setup()` suffices
+once the worker and Pure data are prepared; Blink is optional.
+
 ## Build the worker
 
 Linux, a C++17 compiler, CMake >=3.16 and system librime development files are
@@ -64,6 +94,40 @@ Minuet and scheme fixtures. The existing `ci.yml` retains the full integration
 regressions on both native architectures. These checks do not certify portable
 binaries or arbitrary schemes.
 
+## Checks, deployment and status
+
+- `:checkhealth rime_bridge` is passive: worker/build prerequisites, directory
+  permissions, scheme-file hints and the last runtime result. It starts no worker.
+- `:RimeInfo` shows resolved configuration, state and read-only scheme hints.
+- `:RimeCheck` explicitly starts/initializes the worker if necessary and checks
+  protocol compatibility and the engine schema list. Initialization can create
+  the configured directory and acquire its lock. It does **not** deploy data,
+  select a schema or enable input; availability in the list is not proof of
+  working dictionaries, candidates or model quality.
+- `:RimeDeploy` disables input, deploys through librime, then verifies that the
+  configured schema appears in the engine list. Start/success/failure are reported.
+  Duplicate deploy requests and enable attempts during deployment do not capture
+  input or start another deployment. Re-enable explicitly after success.
+- `:RimeStop` releases input mappings and requests worker shutdown (including its
+  normal learning-data flush). `:RimeDisable` only disables input, retaining the worker.
+
+`require("rime_bridge").status()` retains its engine `phase` and adds `mode`
+(`off`, `starting`, `on`, `deploying`, `error`), `active` for the current buffer and
+`buffer` for the enabled/pending target. The existing `enabled` field means there
+is an attached input session, not necessarily in the current buffer. Deployment
+state is `running`, `succeeded` or `failed` when available. Failures carry recovery
+`advice`; stderr remains reduced to privacy-safe categories, never raw input logs.
+
+For a statusline component, use `require("rime_bridge").statusline` (a function)
+or `%{v:lua.require('rime_bridge').statusline()}` in a native statusline. It returns
+fixed labels such as `Rime:on`; it neither reads scheme files nor starts a process.
+No statusline, color scheme, new preedit UI or notification styling is installed.
+
+File hints distinguish missing sources, missing compiled schemas and potentially
+stale direct schema/global YAML. They are advisory: included dictionaries, Lua,
+conversion resources and model changes are not fully tracked. Explicitly redeploy
+after updating those resources even if no stale-file warning is shown.
+
 ## Data and scope
 
 Users own the system engine and a separate writable Rime user directory. The
@@ -106,7 +170,7 @@ through your plugin manager, then configure a dedicated, prepared Rime directory
 
 ```lua
 require("rime_bridge").setup({
-  worker = "/absolute/path/to/rime-bridge-worker", -- default: PATH lookup
+  worker = "/absolute/path/to/rime-bridge-worker", -- optional override; local build, then PATH
   user_dir = "/absolute/path/to/dedicated-rime-data",
   schema = "wanxiang_pure", -- default; use the upstream Pure schema ID
 })
@@ -295,13 +359,41 @@ cmake -S . -B build -DRIME_BRIDGE_MINUET_DIR=/absolute/path/to/minuet-ai.nvim
 ctest --test-dir build --output-on-failure
 ```
 
-The six-test suite (Blink and Minuet paths supplied) passes on the measured host.
+The original six-test suite (Blink and Minuet paths supplied) passed on the measured host.
+Current CI additionally registers lua.management for installation/data/status checks.
 The Minuet test uses actual nvim_input for `nihao → 你好`, real Minuet virtual text
 and a stub **network provider only**. It verifies existing/late AI suppression,
 isolation between compositions and AI recovery after disabling Rime. The fork's
 66 existing tests and separate real-key cancellation regression also pass. The
 new cancellation test fails against the pre-fix virtualtext.lua from `cc0346c`;
 this is a verified regression test, not merely a green smoke test.
+
+## Integrating existing schemes and safe updates
+
+1. Use a **dedicated copy**, never the directory actively used by a desktop IME
+   or another worker. `user_dir` is writable; `shared_dir` is the system/shared
+   resource root, not a replacement for writable user data.
+2. With the original writer stopped, copy the scheme's source YAML, dictionary,
+   OpenCC/Lua/model resources as required by its upstream documentation. Point
+   `schema` at its schema ID and include that ID in `default.custom.yaml`'s
+   `patch.schema_list`. Changing the Lua option alone does not edit that list.
+3. Keep personal `*.custom.yaml` patches and learned `*.userdb` data. Do not copy
+   old `build/` caches or lock files as installation inputs. Custom schemes may
+   need a compatible system Lua extension; Pure does not.
+4. Run `:RimeDeploy`, inspect `:RimeInfo` / `:RimeCheck`, then verify actual typed
+   candidates. The plugin does not rewrite source configuration or supply missing
+   scheme components. A schema-list check does not certify arbitrary schemes.
+
+Before updates, stop input and the worker (`:RimeStop`, or exit Neovim), wait for
+worker exit/flush and ensure no other writer is using the directory. Back up the
+**whole dedicated directory**, including custom patches and learned databases.
+Download new upstream resources into a separate staging directory, review/diff
+changes, then merge only intended upstream files. Never unpack a release over
+personal data or blindly delete `*.userdb`, patches or locks. Explicitly redeploy
+and test input after the merge. To roll back, stop all writers again and restore
+the complete backup, not just old caches. Source/patch preservation across repeated
+explicit deployment is covered by the runtime tests; userdb learning/persistence
+is covered by the worker protocol tests.
 
 ## Reproducible Pure data preparation
 

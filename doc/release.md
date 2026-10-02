@@ -35,7 +35,7 @@ results. A configured workflow is not evidence of a successful hosted run.
 
 .github/workflows/ci.yml builds on Ubuntu 22.04 x86_64 and ARM64, installing system
 packages **on the ephemeral CI runner only**. Action/dependency commits and the
-Neovim download digest are fixed. It runs six fixed-fixture editor/protocol tests,
+Neovim download digest are fixed. It runs seven fixed-fixture management/editor/protocol tests,
 Minuet's tests and isolated-prefix install, retaining CTest output for seven days.
 AI network calls are replaced only in tests. There are no user data or model
 downloads in CI. Current unreleased CMake fetches pinned JSON sources into the

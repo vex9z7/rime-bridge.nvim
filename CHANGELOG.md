@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Discover the plugin-local worker before PATH, preserve explicit overrides and
+  default to a dedicated Neovim data directory; add a tested Lazy/Blink example.
+- Add passive scheme/deployment hints, explicit RimeCheck and RimeStop commands,
+  verified deployment completion and protection against concurrent activation.
+- Add buffer-aware status/statusline fields and actionable health/recovery advice,
+  retaining opt-in input, explicit deployment and privacy-safe diagnostics.
+
 - Run native Linux x86_64 and ARM64 build/install checks on Ubuntu 22.04/24.04
   and full editor/protocol regressions on Ubuntu 22.04 for both architectures.
 - Explicitly install make in clean build CI containers; CMake alone does not

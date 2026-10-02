@@ -139,7 +139,63 @@ local function test()
 	assert(not vim.inspect(failed):find("PRIVATE_INPUT"), "loader stderr leaked")
 	plugin.stop()
 	vim.fn.delete(loader)
-	print("PASS: setup, protocol, startup ownership, busy editor, privacy-safe diagnostics and worker failures")
+	-- Real check/deploy workflow preserves user-managed sources and unrelated data.
+	local prepared = vim.fn.tempname()
+	plugin.setup({ worker = worker, user_dir = prepared, schema = "input_fixture" })
+	plugin.check()
+	assert(vim.wait(10000, function()
+		return plugin.status().checked or plugin.status().error
+	end, 10))
+	local initial = plugin.status()
+	assert(
+		(initial.checked and not initial.schema_available)
+			or (initial.error and initial.error:find("cannot list deployed schemas")),
+		vim.inspect(initial)
+	)
+	assert(not plugin.is_active() and not plugin.status().enabled, "check enabled input")
+	assert(vim.fn.filereadable(prepared .. "/default.custom.yaml") == 0, "check seeded a scheme")
+	plugin.stop()
+	vim.wait(2200, function()
+		return false
+	end, 20)
+	local originals = {}
+	for _, name in ipairs({ "default.custom.yaml", "input_fixture.schema.yaml", "input_fixture.dict.yaml" }) do
+		originals[name] = vim.fn.readfile(vim.env.RIME_BRIDGE_SOURCE .. "/tests/fixtures/" .. name)
+		vim.fn.writefile(originals[name], prepared .. "/" .. name)
+	end
+	vim.fn.mkdir(prepared .. "/unrelated.userdb", "p")
+	vim.fn.writefile({ "preserve user data" }, prepared .. "/unrelated.userdb/sentinel")
+	for round = 1, 2 do
+		if round == 2 then
+			originals["default.custom.yaml"][#originals["default.custom.yaml"] + 1] = "# user customization retained"
+			local path = prepared .. "/default.custom.yaml"
+			local mtime = vim.uv.fs_stat(path).mtime.sec
+			vim.fn.writefile(originals["default.custom.yaml"], path)
+			vim.uv.fs_utime(path, mtime + 2, mtime + 2)
+		end
+		plugin.deploy()
+		assert(plugin.status().mode == "deploying")
+		assert(vim.wait(10000, function()
+			return plugin.status().mode ~= "deploying"
+		end, 10))
+		assert(
+			plugin.status().deployment == "succeeded" and plugin.status().schema_available,
+			vim.inspect(plugin.status())
+		)
+		assert(not plugin.is_active() and plugin.statusline() == "Rime:off")
+		for name, contents in pairs(originals) do
+			assert(vim.deep_equal(vim.fn.readfile(prepared .. "/" .. name), contents), "deploy replaced " .. name)
+		end
+		assert(vim.fn.readfile(prepared .. "/unrelated.userdb/sentinel")[1] == "preserve user data")
+	end
+	plugin.check()
+	plugin.stop()
+	vim.wait(2200, function()
+		return false
+	end, 20)
+	assert(plugin.status().phase == "stopped", "late check revived stopped state")
+	vim.fn.delete(prepared, "rf")
+	print("PASS: setup, protocol, lifecycle, runtime checks, repeated safe deployment, diagnostics and worker failures")
 end
 local ok, err = xpcall(test, debug.traceback)
 if not ok then
